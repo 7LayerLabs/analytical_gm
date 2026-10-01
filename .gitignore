@@ -1,0 +1,14 @@
+data/
+versions/
+__pycache__/
+*.pyc
+game-access.json
+.env
+.env.*
+*.csv
+*.duckdb
+*.log
+verification*.json
+*.png
+*.bin
+.venv/
