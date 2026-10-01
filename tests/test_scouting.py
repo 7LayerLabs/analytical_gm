@@ -14,6 +14,13 @@ class ScoutingBenchmarks(unittest.TestCase):
         obj.mlb=players;obj.starts={(1,4):130,(2,4):8,(3,4):120};obj._cohorts={}
         return obj,players
 
+    def test_free_agent_search_excludes_rostered_and_draft_players(self):
+        from frontoffice import Office
+        base=dict(name='Test Pitcher',kind='pit',position='P',grade=5)
+        obj=Office.__new__(Office);obj.d=SimpleNamespace(profiles=[dict(base,id=1,free_agent=True,draft_eligible=False),dict(base,id=2,free_agent=False,draft_eligible=False),dict(base,id=3,free_agent=True,draft_eligible=True)])
+        obj.card=lambda p:p
+        self.assertEqual([p['id'] for p in obj.candidates('free','Pitcher')],[1])
+
     def test_regulars_follow_usage_not_best_skill(self):
         obj,_=self.fixture();ps,method=obj.starters('2B')
         self.assertEqual([p['id'] for p in ps],[1,3])

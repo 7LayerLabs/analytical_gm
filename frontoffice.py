@@ -209,7 +209,7 @@ class Office:
         return {'adjustment':round(max(-.4,min(.4,adjust)),3),'notes':notes,'home':home.get('name'),'weighted':f,'label':'Preference fit; not a park-adjusted forecast'}
 
     def candidates(self,scope='organization',q='',kind='',position=''):
-        d=self.d;ps=d.own() if scope=='organization' else d.active() if scope=='active' else [p for p in d.profiles if p['league_id']==d.league] if scope=='mlb' else [p for p in d.profiles if p['draft_eligible']] if scope=='draft' else d.profiles
+        d=self.d;ps=d.own() if scope=='organization' else d.active() if scope=='active' else [p for p in d.profiles if p['free_agent'] and not p['draft_eligible']] if scope=='free' else [p for p in d.profiles if p['league_id']==d.league] if scope=='mlb' else [p for p in d.profiles if p['draft_eligible']] if scope=='draft' else d.profiles
         ps=[p for p in ps if q.lower() in p['name'].lower() and (not kind or p['kind']==kind) and (not position or p['position']==position)]
         return sorted([self.card(p) for p in ps],key=lambda x:x['grade'],reverse=True)
 
