@@ -98,6 +98,7 @@ def import_snapshot(force=False):
                 sums=','.join(f'sum(coalesce("{k}",0)) "{k}"' for k in fields)
                 con.execute(f'CREATE TABLE {table} AS SELECT player_id,year,league_id,{sums} FROM {src} WHERE split_id=1 AND game_id=0 GROUP BY player_id,year,league_id')
             manifest={'id':sid,'created_at':datetime.now(timezone.utc).isoformat(),'game_date':str(league['current_date']),
+                'source_id':hashlib.sha256(str(source.resolve()).casefold().encode()).hexdigest()[:12],
                 'season':int(league['season_year']),'team_id':config()['team_id'],'league_id':lid,'signature':before,
                 'hashes':hashes,'tables':counts,'issues':issues,'rating_checks':ratings,
                 'batting_splits':batting_splits,'pitching_splits':pitching_splits,

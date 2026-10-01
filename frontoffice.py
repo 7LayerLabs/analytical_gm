@@ -425,9 +425,13 @@ class Office:
         return {'previous':prev[0]['id'],'items':items,'note':'Compared with the preceding captured export; multiple captures on the same game date may have identical data.'}
 
     def home(self):
-        d=self.d;r=self.roster();b=d.briefing();lineup=[x['player'] for x in r['lineup']];starters=[x['player'] for x in r['rotation'] if x['player']];groups=[('Offense',lineup),('Rotation',starters),('Bullpen',[x['player'] for x in r['bullpen']])]
+        from season_projection import season_projection
+        d=self.d;r=self.roster();b=d.briefing()
+        try:prediction=season_projection(d)
+        except ValueError as error:prediction={'error':str(error)}
+        lineup=[x['player'] for x in r['lineup']];starters=[x['player'] for x in r['rotation'] if x['player']];groups=[('Offense',lineup),('Rotation',starters),('Bullpen',[x['player'] for x in r['bullpen']])]
         outlook=[{'name':name,'grade':round(sum(x['grade'] for x in ps)/len(ps),1) if ps else None,'count':len(ps)} for name,ps in groups]
-        return {'briefing':b,'roster':r,'outlook':outlook,'blueprint':self.b,'changes':self.changes(),'watchlist':self.state['watchlist'],'locks':self.state['locks'],'summary':f"{d.team_name(d.team)} are in {self.b['seasons'].get(str(d.year),'unplanned').lower()} mode. {r['shape']}; review the back end and injury coverage before advancing.",'schedule':self.parks,'decisions':self.state['decisions'][:5]}
+        return {'prediction':prediction,'briefing':b,'roster':r,'outlook':outlook,'blueprint':self.b,'changes':self.changes(),'watchlist':self.state['watchlist'],'locks':self.state['locks'],'summary':f"{d.team_name(d.team)} are in {self.b['seasons'].get(str(d.year),'unplanned').lower()} mode. {r['shape']}; review the back end and injury coverage before advancing.",'schedule':self.parks,'decisions':self.state['decisions'][:5]}
 
 def evaluate(d,case):
     o=Office(d);kind=case.get('type','Replacement');pid=int(case.get('player_id') or 0);p=d.by_id.get(pid);override=bool(case.get('override'));protected={l['player_id'] for l in o.state['locks'] if l['scope']=='trade'}
