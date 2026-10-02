@@ -288,6 +288,14 @@ class Office:
         bullpen.sort(key=lambda x:(x['locked'] or x['player']['id'] in rosterlocked,x['player']['grade']),reverse=True)
         bullpen=bullpen[:8]
         bench=sorted([p for p in hitters if p['id'] not in used],key=lambda p:(p['id'] in rosterlocked,self.card(p)['grade']),reverse=True)[:4]
+        # Preserve a second usable catcher instead of filling every bench spot by bat grade.
+        catchers=[p for p in hitters if number(d.ratings['players_fielding'].get(p['id'],{}).get('fielding_rating_pos2'))>=4]
+        selected_bats=used|{p['id'] for p in bench}
+        if sum(p['id'] in selected_bats for p in catchers)<2:
+            candidates=sorted([p for p in catchers if p['id'] not in selected_bats],key=lambda p:self.card(p)['grade'],reverse=True)
+            replaceable=sorted([p for p in bench if p['id'] not in rosterlocked and p not in catchers],key=lambda p:self.card(p)['grade'])
+            if candidates and replaceable:bench.remove(replaceable[0]);bench.append(candidates[0])
+            else:warnings.append('Backup catcher coverage is incomplete; resolve this before using the roster.')
         selectedids={x['player']['id'] for x in lineup}|{x['player']['id'] for x in rotation if x['player']}|{x['player']['id'] for x in bullpen}|{p['id'] for p in bench}
         for l in locks:
             if l['scope']=='roster' and l['player_id'] not in selectedids and any(p['id']==l['player_id'] for p in pool):warnings.append(f"Roster lock for {l['name']} exceeds available role places. Resolve the conflict; lock remains binding.")
@@ -296,7 +304,15 @@ class Office:
         from pitching_roles import pitching_recommendations
         pitching= pitching_recommendations(self,rotation,bullpen)
         grades=[x['player']['grade'] if x['player'] else 0 for x in rotation];shape='Top-heavy rotation' if sum(grades[:2])/2-sum(grades[2:])/3>=1.5 else 'Uneven rotation coverage' if 0 in grades else 'Balanced rotation profile'
-        return {'pitching_recommendations':pitching,'lineup':lineup,'rotation':rotation,'bullpen':bullpen,'bench':[self.card(p) for p in bench],'selected_count':len(selectedids),'warnings':warnings,'ready_for_review':not warnings,'shape':shape,'internal':internal,'hand':hand,'unfilled':[v for v in ['C','1B','2B','3B','SS','LF','CF','RF','DH'] if v not in placements],'depth':d.depth(),'method':'Global position assignment maximizes platoon skill preference plus speed and position defense. Position rating ≥4; explicit locks first. Five starters, up to eight relievers and four bench bats. This optimizes the stated heuristic, not simulated runs or legal roster moves.'}
+        result={'pitching_recommendations':pitching,'lineup':lineup,'rotation':rotation,'bullpen':bullpen,'bench':[self.card(p) for p in bench],'selected_count':len(selectedids),'warnings':warnings,'ready_for_review':not warnings,'shape':shape,'internal':internal,'hand':hand,'unfilled':[v for v in ['C','1B','2B','3B','SS','LF','CF','RF','DH'] if v not in placements],'depth':d.depth(),'method':'Global position assignment maximizes platoon skill preference plus speed and position defense. Position rating ≥4; explicit locks first. Five starters, up to eight relievers and four bench bats. This optimizes the stated heuristic, not simulated runs or legal roster moves.'}
+
+        if internal:
+            from roster_moves import roster_moves
+            result['moves']=roster_moves(self,result)
+            if result['moves']['moves']:
+                result['warnings'].append('Internal selections are conditional: review each paired call-up/assignment, development readiness and roster eligibility before making moves.')
+                result['ready_for_review']=False
+        return result
 
     def benchmarks(self,year=None):
         d=self.d;year=int(year or d.year)
