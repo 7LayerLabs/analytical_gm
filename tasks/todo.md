@@ -9,21 +9,29 @@ analytics live one click down under "See the numbers". Claude owns the project (
 
 **Status:** the Decision Lab now gives assistant-GM calls (Do it / Do it if... / Don't / Hang up, marked
 strong or lean) for trades, signings, extensions and call-ups, plus a "Compare trade offers" question.
-All built on a dollar-value engine calibrated from the save on every export. 160 tests pass.
+All built on a dollar-value engine calibrated from the save on every export. The Clubhouse leads with
+the assistant GM's suggested moves (chains + comparisons with league-ranked stat lines). Nav: Clubhouse,
+Trades, Decisions, Roster, Scouting, Find help, Farm, More. 165 tests pass.
 
 ### What's left, in order
 1. **Baseball pros/cons for signings, extensions, call-ups** (D1d). Trades already talk baseball (role,
    stat line, best tool, injury, contract). Signing/extension/call-up cards still lean on
    "projects around X wins". Reuse `trade_call.scouting_line` + the analytics review's `people` data.
-2. **Clubhouse "your top moves this week"** (D4). Replace "The department's read" with the biggest
-   roster hole + the best fix by name and dollars (internal call-up, free agent, or trade target).
+2. **Jev (TypeSafe) in the assistant GM** — PLAN WITH DEREK (spends TypeSafe credits; key is already set in
+   TYPESAFE_API_KEY). Proposed: (a) "Is it real?" read on hot minor leaguers in Clubhouse moves (results vs
+   ratings, e.g. Tolle), (b) a second opinion badge on trade calls (agrees / disagrees + confidence),
+   on-demand buttons, cached per export. Existing hook: jev.review() on player reports.
+2b. **Moves engine next steps:** biggest-hole fixes from outside (free agents / trade targets by name and
+   dollars), not just internal call-ups; use the blueprint identity to weight suggestions.
 3. **Player reports lead with the assistant GM** (D4). Value line from `value.py` + a keep / trade /
    extend call at the top; current analytics fold under "See the numbers".
 4. **Find help ranked by value per dollar** (D4), in the same voice; strip the repeated boilerplate
    checks and remaining "department" copy across screens.
 5. **Injury-replacement and trade-deadline questions** (D3b) still use the old department read; give
    them calls ("Use X", "Sell these three: ...").
-6. **Identities merge with Theo Scout** (D5). WAITING ON DEREK: Theo's 10 are the base; which of the
+6. **Identities merge with Theo Scout** (D5). Derek: "blueprint link doesn't work the way it should" —
+   audit 2026-10-01 found it saves fine; likely complaint is that identities don't change any
+   suggestions (confirm with Derek). WAITING ON DEREK: Theo's 10 are the base; which of the
    current app's 7 should stay? Old-school Baseball, Edgehunter, Trade Architect, Sustainable
    Contender, Homegrown Core, Stars & Support, Opportunity Buyer. Then make identities actually change
    rankings (Theo's weight vectors), add the "hunt other clubs" list and exit-velo/barrel data, and
@@ -39,6 +47,7 @@ All built on a dollar-value engine calibrated from the save on every export. 160
 - Later: fold GM Portal ideas in; generalize beyond Boston (e.g. for the future online league).
 
 ### Known rough edges
+- Moves: "Worth a look" only fires when the ratings gap is within ~1 win/season (0.3 for relievers).
 - Team/player option years are treated as scheduled salary; options aren't judged yet.
 - First Decision Lab review after a new export takes ~6s while the value engine calibrates.
 - Pruning can leave empty `csv` folders in old snapshots (harmless).
@@ -103,7 +112,11 @@ the current ones Derek likes; order trades → signings/extensions/promotions �
 - [x] D3 signings, extensions, call-ups (c5612f8)
 - [x] D1b trade pros/cons in baseball terms + who-replaces-whom wins + win-now guard (14c974a)
 - [x] D1c compare trade offers (14c974a)
-- [ ] D1d, D3b, D4, D5 — see "What's left" above
+- [x] Day-to-day players treated as available (94b0607): OOTP flags DTD as injured; the app had pulled Early
+  from the rotation and Story from SS.
+- [x] Clubhouse assistant-GM moves + nav cleanup + Trades page (1e1d0a8). Full UI audit: 15 pages, 0 errors,
+  0 failed requests; More menu, Trades tabs, all Decisions questions, player reports, older exports work.
+- [ ] D1d, D3b, D4 (player reports, Find help), D5 — see "What's left" above
 
 ## Review
 ### Changes made (2026-10-01)
