@@ -1,7 +1,8 @@
-"""The assistant GM's call on a trade: one answer, why, and what would change it.
+"""The assistant GM's call on a trade: one answer, why in baseball terms, and what would change it.
 
 Built on value.py. The analytics department's detailed review (trade_review.py) still runs
-and sits underneath this call as "See the numbers".
+and sits underneath this call as "See the numbers"; its roster comparison and scouting
+detail feed the plain-English pros and cons here.
 """
 
 from collections import Counter
@@ -18,9 +19,8 @@ WIN_NOW_PREMIUM = {
     "Selective sell": -0.5,
     "Rebuild": -0.5,
 }
-MIN_SCALE = (
-    10_000_000  # small deals are judged against at least $10M so pennies don't swing the call
-)
+MIN_SCALE = 10_000_000  # small deals are judged against at least $10M so pennies don't swing it
+CONTENDING = ("Win now", "All in")
 
 
 def decide(edge, scale):
@@ -46,16 +46,14 @@ def trade_call(office, send, receive, mode, review=None):
     def worth(v):
         return v.get("value", 0)
 
-    def wins(v):
-        return v.get("war_this_season", 0)
-
     give = sum(worth(v) for v in outgoing)
     get = sum(worth(v) for v in incoming)
-    wins_now = sum(wins(v) for v in incoming) - sum(wins(v) for v in outgoing)
+    people = {x["player"]["id"]: x for x in (review or {}).get("people", [])}
+    roles, holes, field_change = on_field(d, engine, review, [v["name"] for v in outgoing])
+    wins_now = field_change * engine.season_left
     premium = WIN_NOW_PREMIUM.get(mode, 0.0) * wins_now * engine.dollars_per_war
     edge = get - give + premium
-    scale = max(abs(give), abs(get))
-    call, strength = decide(edge, scale)
+    call, strength = decide(edge, max(abs(give), abs(get)))
 
     future_salary = sum(s["salary"] for v in incoming for s in v.get("seasons", [])) - sum(
         s["salary"] for v in outgoing for s in v.get("seasons", [])
@@ -64,39 +62,55 @@ def trade_call(office, send, receive, mode, review=None):
         [s["year"] for v in outgoing + incoming for s in v.get("seasons", [])] or [d.year]
     )
 
+    def line(v, ours):
+        p = d.by_id[v["id"]]
+        return scouting_line(p, people.get(v["id"]), roles.get(p["name"]), ours, v)
+
     pros, cons = [], []
     for v in incoming:
         if v.get("free_agent"):
             cons.append(f"{v['name']} is a free agent; he can't come over in a trade.")
         elif worth(v) >= 0:
-            pros.append(f"{v['name']}: {v['summary']}")
+            pros.append(line(v, ours=False))
         else:
-            cons.append(f"We take on {v['name']}'s contract. {v['summary']}")
+            cons.append(f"We take on {v['name']}'s contract. {line(v, ours=False)}")
     for v in outgoing:
         if worth(v) > 0:
-            cons.append(f"We give up {v['name']}. {v['summary']}")
+            cons.append(f"We lose {line(v, ours=True)}")
         else:
-            pros.append(f"We get out from under {v['name']}'s deal. {v['summary']}")
+            pros.append(f"We get out from under {v['name']}'s deal: {contract_tail(v)}")
+    cons.extend(holes)
     if wins_now >= 0.3:
-        pros.append(f"Adds about {wins_now:.1f} wins over the rest of {d.year}.")
+        pros.append(f"Makes us about {wins_now:.1f} wins better over the rest of {d.year}.")
     elif wins_now <= -0.3:
-        cons.append(f"Costs us about {-wins_now:.1f} wins over the rest of {d.year}.")
+        cons.append(f"Makes us about {-wins_now:.1f} wins worse over the rest of {d.year}.")
     if future_salary <= -1_000_000:
         pros.append(f"Cuts about {dollars(-future_salary)} of salary through {last_year}.")
     elif future_salary >= 1_000_000:
         cons.append(f"Adds about {dollars(future_salary)} of salary through {last_year}.")
     for i in list(send) + list(receive):
-        p = d.by_id[i]
-        if p.get("no_trade"):
-            cons.append(f"{p['name']} has a no-trade clause; he has to agree to it.")
-        if i in receive and (p.get("injured") or p.get("on_dl")):
-            cons.append(f"{p['name']} is hurt right now.")
+        if d.by_id[i].get("no_trade"):
+            cons.append(f"{d.by_id[i]['name']} has a no-trade clause; he has to agree to it.")
 
-    roster = roster_lines(review)
-    ask_for = []
-    if call in ("Do it if...", "Don't"):
-        ask_for = suggest_add(d, engine, receive, send, -edge)
-    headline = headline_for(call, outgoing, incoming, give, get, edge, ask_for)
+    # A contender doesn't take a deal that makes it clearly worse this season, however good
+    # the long-term value, unless the hole gets filled first.
+    backfill = None
+    if call == "Do it" and mode in CONTENDING and wins_now <= -0.75:
+        backfill = max(outgoing, key=lambda v: v.get("war_this_season", 0))["name"]
+        call, strength = "Do it if...", "lean"
+
+    ask_for = (
+        suggest_add(d, engine, receive, send, -edge) if call in ("Do it if...", "Don't") else []
+    )
+    if backfill:
+        headline = (
+            f"Good value ({dollars(get)} back), but it makes us about "
+            f"{-wins_now:.1f} wins worse this year. Do it only if we can replace {backfill}."
+        )
+        fix = f"Line up {backfill}'s replacement first (another trade or a call-up), then make this deal."
+    else:
+        headline = headline_for(call, outgoing, give, get, edge, ask_for)
+        fix = make_it_work(call, edge, ask_for)
 
     return {
         "call": call,
@@ -111,10 +125,12 @@ def trade_call(office, send, receive, mode, review=None):
         "get_players": [brief(v) for v in incoming],
         "pros": pros,
         "cons": cons,
-        "roster": roster,
+        "roster": roster_lines(review),
         "ask_for": ask_for,
-        "make_it_work": make_it_work(call, edge, ask_for),
+        "make_it_work": fix,
         "price_of_a_win": engine.dollars_per_war,
+        "salary_change": round(future_salary, -5),
+        "salary_through": last_year,
     }
 
 
@@ -124,6 +140,16 @@ GROUPS = [
     ("Rotation", lambda role: role.startswith("SP")),
     ("Bullpen", lambda role: role.startswith("RP")),
 ]
+TOOL_NAMES = {
+    "contact": "contact",
+    "gap": "gap power",
+    "power": "power",
+    "eye": "plate discipline",
+    "strikeouts": "strikeout avoidance",
+    "stuff": "stuff",
+    "movement": "movement",
+    "control": "control",
+}
 
 
 def names(items):
@@ -147,6 +173,8 @@ def roster_lines(review):
         if not outs and not ins:
             continue
         parts = ([f"{names(outs)} out"] if outs else []) + ([f"{names(ins)} in"] if ins else [])
+        if outs and not ins and any(c.get("before") and not c.get("after") for c in group):
+            parts.append("nobody healthy to replace him")
         line = f"{label}: {', '.join(parts)}."
         moves = [f"{n} to {after[n]}" for n in after if n in before and after[n] != before[n]]
         if moves and label.startswith("Lineup"):  # pitchers sliding down a slot isn't news
@@ -155,12 +183,134 @@ def roster_lines(review):
     return lines
 
 
+def group_of(role):
+    return next((label for label, test in GROUPS if test(role)), None)
+
+
+def on_field(d, engine, review, leaving=()):
+    """Who plays instead of whom (vs righties): each player's role, any holes left, and the
+    change in full-season wins. An empty slot means a replacement-level call-up, worth zero."""
+    if not review:
+        return {}, [], 0.0
+    vsr = next((c for c in review.get("comparisons", []) if c["hand"] == "vsr"), None)
+    roles, holes, change = {}, [], 0.0
+
+    def rate(card):
+        return engine.current_rate(d.by_id[card["id"]]) if card else 0.0
+
+    for c in (vsr or {}).get("changes", []):
+        before, after = c.get("before"), c.get("after")
+        if before:
+            roles.setdefault(before["name"], c["role"])
+        if after:
+            roles.setdefault(after["name"], c["role"])
+        group = group_of(c["role"])
+        if not group:
+            continue  # bench shuffles don't move the needle
+        change += rate(after) - rate(before)
+        if before and not after:
+            # Name the player we're trading, not whoever slid down into the empty slot.
+            gone = [n for n in leaving if n in roles and group_of(roles[n]) == group]
+            who = names(gone) if gone else before["name"]
+            slot = "start every fifth day" if group == "Rotation" else "fill that spot"
+            holes.append(
+                f"Leaves a hole: with {who} gone, nobody healthy is ready to {slot}, "
+                "so a replacement-level call-up does it."
+            )
+    for x in review.get("people", []):  # where the analytics review would play incoming players
+        name, jobs = x["player"]["name"], x.get("jobs") or []
+        if name not in roles and jobs:
+            roles[name] = jobs[0].split(": ")[-1]
+    return roles, holes, change
+
+
+def avg3(x):
+    return f"{x:.3f}".lstrip("0") if x is not None else "---"
+
+
+def contract_tail(v):
+    seasons = [s for s in v.get("seasons", []) if s["status"] != "minors"]
+    if not seasons:
+        return ""
+    pay = sum(s["full_season_salary"] for s in seasons) / len(seasons)
+    return f"{dollars(pay)} a year through {seasons[-1]['year']}."
+
+
+def role_words(role, ours, p):
+    """'our #2 starter', "he'd play 2B every day", ... from a roster-slot code."""
+    if not role:
+        if ours:
+            return None
+        if p.get("injured") or p.get("on_dl"):
+            return "he'd join us once he's healthy"
+        return (
+            "he wouldn't crack our lineup"
+            if p["kind"] == "bat"
+            else "he wouldn't make our staff yet"
+        )
+    if role.startswith("SP"):
+        n = role.split()[-1]
+        return f"our #{n} starter" if ours else f"he'd slot in as our #{n} starter"
+    if role.startswith("RP"):
+        late = int(role.split()[-1]) <= 3
+        if ours:
+            return "one of our top relievers" if late else "a middle reliever"
+        return "he'd pitch late innings for us" if late else "he'd pitch middle relief"
+    if role.startswith("Bench"):
+        return "a bench bat" if ours else "he'd come off our bench"
+    return f"our everyday {role}" if ours else f"he'd play {role} every day"
+
+
+def scouting_line(p, person, role, ours, v):
+    """One sentence a GM would say: who he is for us, what he's done, his best tool, his deal."""
+    o = (person or {}).get("observed") or {}
+    tools = (person or {}).get("tools") or {}
+    if p["kind"] == "bat":
+        hand = {"L": "bats left", "R": "bats right", "S": "switch-hitter"}.get(p.get("bats"), "")
+        stats = (
+            f"{avg3(o.get('avg'))}/{avg3(o.get('obp'))}/{avg3(o.get('slg'))}, "
+            f"{int(o.get('hr') or 0)} HR, {int(o.get('sb') or 0)} SB in {int(o['pa'])} PA this year"
+            if o.get("pa")
+            else "no big-league at-bats this year"
+        )
+    else:
+        hand = {"L": "lefty", "R": "righty"}.get(p.get("throws"), "")
+        stats = (
+            f"{o['era']:.2f} ERA over {o['ip_display']} IP, {o.get('k_pct') or 0:.0%} strikeouts this year"
+            if o.get("ip_display") and o.get("era") is not None
+            else "no big-league innings this year"
+        )
+    who = role_words(role, ours, p)
+    label = p["name"] + (f", {who}" if who and ours else "")
+    extras = []
+    if tools:
+        best, rating = max(tools.items(), key=lambda kv: kv[1] or 0)
+        if (rating or 0) >= 6:
+            word = "elite" if rating >= 8 else "plus" if rating == 7 else "above-average"
+            extras.append(f"{word} {TOOL_NAMES.get(best, best)} ({rating}/10)")
+    if who and not ours:
+        extras.append(who)
+    if p.get("injured") or p.get("on_dl"):
+        days = int(p.get("injury_days") or 0)
+        extras.append(
+            f"on the IL, back in about {days} day{'s' if days != 1 else ''}"
+            if days
+            else "hurt right now"
+        )
+    sentence = f"{label} ({hand}): {stats}" if hand else f"{label}: {stats}"
+    if extras:
+        sentence += "; " + "; ".join(extras)
+    return (sentence + ". " + contract_tail(v)).strip()
+
+
 def brief(v):
     return {
         "id": v["id"],
         "name": v["name"],
         "value": v.get("value", v.get("asking_value", 0)),
         "summary": v["summary"],
+        "age": v.get("age"),
+        "control_through": v.get("control_through"),
     }
 
 
@@ -186,7 +336,7 @@ def suggest_add(d, engine, receive, send, gap):
     return [brief(v) for v in options[:3]]
 
 
-def headline_for(call, outgoing, incoming, give, get, edge, ask_for):
+def headline_for(call, outgoing, give, get, edge, ask_for):
     best_out = max(outgoing, key=lambda v: v.get("value", 0), default=None)
     if call == "Hang up":
         line = f"We'd give {dollars(give)} of value for {dollars(get)}."
@@ -207,14 +357,12 @@ def headline_for(call, outgoing, incoming, give, get, edge, ask_for):
 
 
 def make_it_work(call, edge, ask_for):
-    if call in ("Do it",):
+    if call == "Do it" or edge >= 0:
         return None
     gap = dollars(-edge)
     if call == "Hang up":
         return f"Nothing realistic. They'd have to add about {gap} of value to make it even."
-    names = ", ".join(f"{a['name']} ({dollars(a['value'])})" for a in ask_for)
-    if names:
-        return (
-            f"Ask them to add about {gap} more. Players on their side that would cover it: {names}."
-        )
+    listed = ", ".join(f"{a['name']} ({dollars(a['value'])})" for a in ask_for)
+    if listed:
+        return f"Ask them to add about {gap} more. Players on their side that would cover it: {listed}."
     return f"Ask them to add about {gap} more, or take something off our side."

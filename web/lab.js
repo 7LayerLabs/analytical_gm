@@ -21,6 +21,11 @@ const labQuestions = [
     detail: "Choose the players by name and compare the package.",
   },
   {
+    type: "Offers",
+    title: "Compare trade offers",
+    detail: "Got offers for a player on the block? Line them up and pick one.",
+  },
+  {
     type: "Extension",
     title: "Should we extend him?",
     detail: "Review the player, his existing contract and our window.",
@@ -53,20 +58,32 @@ lab = async function () {
 function simpleCaseForm(choice, mode) {
   const kind = choice.type,
     trade = kind === "Trade",
+    offers = kind === "Offers",
     deadline = kind === "Deadline plan",
     offer = ["Signing", "Extension"].includes(kind),
     year = S.status.snapshot.season;
   const player = trade
     ? `<div class="formgrid"><label>Who are we giving up?<input name="send"></label><label>Who would we receive?<input name="receive"></label></div>`
-    : deadline
-      ? ""
-      : `<label class="case-main-label">${kind === "Replacement" ? "Who needs replacing?" : kind === "Promotion" ? "Which prospect?" : kind === "Signing" ? "Which free agent?" : "Which player?"}<input id="case-player-search" type="search" autocomplete="off" placeholder="Start typing a name" aria-label="Search case player"><input name="player_id" type="hidden"><div id="case-player-matches" aria-live="polite"></div><div id="case-selected-player"></div></label>`;
+    : offers
+      ? `<label class="case-main-label">Who's on the block?<input name="send"></label><p class="case-plan-note">Add the offers you've received: two to four. Each can be one player or a package.</p><div class="formgrid">${[1, 2, 3, 4].map((n) => `<label>Offer ${n}${n > 2 ? " (optional)" : ""}<input name="offer${n}"></label>`).join("")}</div>`
+      : deadline
+        ? ""
+        : `<label class="case-main-label">${kind === "Replacement" ? "Who needs replacing?" : kind === "Promotion" ? "Which prospect?" : kind === "Signing" ? "Which free agent?" : "Which player?"}<input id="case-player-search" type="search" autocomplete="off" placeholder="Start typing a name" aria-label="Search case player"><input name="player_id" type="hidden"><div id="case-player-matches" aria-live="polite"></div><div id="case-selected-player"></div></label>`;
   const position =
     kind === "Replacement"
       ? `<label class="case-position">Or review a position<select name="position">${["P", "C", "1B", "2B", "3B", "SS", "LF", "CF", "RF", "DH"].map((pos) => `<option value="${pos}">${pos === "P" ? "Starting pitcher" : roleNames[pos]}</option>`).join("")}</select></label>`
       : '<input type="hidden" name="position" value="P">';
-  const defaultInputs = `<div hidden>${!trade ? '<input name="send" value=""><input name="receive" value="">' : ""}${!offer ? '<input name="annual_offer" value="0"><input name="offer_years" value="1"><input name="start_year" value="' + (year + 1) + '">' : ""}${kind !== "Promotion" ? '<input name="added_service_days" value="0">' : ""}</div>`;
-  return `<form id="case-form" class="simple-case"><input type="hidden" name="type" value="${kind}">${player}${position}<p class="case-plan-note">Using our <strong>${esc(mode)}</strong> plan and saved player locks.</p><details class="case-options"><summary>More options${offer ? " · offer terms" : ""}</summary><div class="formgrid"><label class="wide">Anything the department should consider?<textarea name="question" placeholder="Optional: tell us what matters to you."></textarea></label><label>Direction for this review<select name="scenario_mode">${options(S.office.modes, mode)}</select></label>${offer ? `<label>Proposed annual salary ($)<input name="annual_offer" type="number" min="0" max="100000000" value="0"><small>Leave blank or zero for an initial review. It is not a confirmed asking price.</small></label><label>Years offered<input name="offer_years" type="number" min="1" max="15" value="1"></label>${kind === "Extension" ? `<label>First year of extension<input name="start_year" type="number" value="${year + 1}"></label>` : '<input type="hidden" name="start_year" value="' + year + '">'}` : ""}${kind === "Promotion" ? '<label>Additional service days to illustrate<input name="added_service_days" type="number" min="0" max="172" value="0"></label>' : ""}${trade ? '<label class="wide"><input type="checkbox" name="override"> Compare without trade protection for this review only. Saved locks stay in place.</label>' : ""}</div></details>${defaultInputs}<p id="case-error" class="case-inline-error" role="alert" hidden></p><div class="actions"><button id="review-case" class="primary">${trade ? "Review this trade" : deadline ? "Review our deadline options" : "Get the department’s read"}</button><button type="button" id="save-case" disabled>Save this case</button></div></form>`;
+  const defaultInputs = `<div hidden>${!trade && !offers ? '<input name="send" value=""><input name="receive" value="">' : ""}${!offer ? '<input name="annual_offer" value="0"><input name="offer_years" value="1"><input name="start_year" value="' + (year + 1) + '">' : ""}${kind !== "Promotion" ? '<input name="added_service_days" value="0">' : ""}</div>`;
+  return `<form id="case-form" class="simple-case"><input type="hidden" name="type" value="${kind}">${player}${position}<p class="case-plan-note">Using our <strong>${esc(mode)}</strong> plan and saved player locks.</p><details class="case-options"><summary>More options${offer ? " · offer terms" : ""}</summary><div class="formgrid"><label class="wide">Anything the department should consider?<textarea name="question" placeholder="Optional: tell us what matters to you."></textarea></label><label>Direction for this review<select name="scenario_mode">${options(S.office.modes, mode)}</select></label>${offer ? `<label>Proposed annual salary ($)<input name="annual_offer" type="number" min="0" max="100000000" value="0"><small>Leave blank or zero for an initial review. It is not a confirmed asking price.</small></label><label>Years offered<input name="offer_years" type="number" min="1" max="15" value="1"></label>${kind === "Extension" ? `<label>First year of extension<input name="start_year" type="number" value="${year + 1}"></label>` : '<input type="hidden" name="start_year" value="' + year + '">'}` : ""}${kind === "Promotion" ? '<label>Additional service days to illustrate<input name="added_service_days" type="number" min="0" max="172" value="0"></label>' : ""}${trade || offers ? '<label class="wide"><input type="checkbox" name="override"> Compare without trade protection for this review only. Saved locks stay in place.</label>' : ""}</div></details>${defaultInputs}<p id="case-error" class="case-inline-error" role="alert" hidden></p><div class="actions"><button id="review-case" class="primary">${buttonLabel(kind)}</button><button type="button" id="save-case" disabled>Save this case</button></div></form>`;
+}
+function buttonLabel(kind) {
+  return kind === "Trade"
+    ? "Review this trade"
+    : kind === "Offers"
+      ? "Compare these offers"
+      : kind === "Deadline plan"
+        ? "Review our deadline options"
+        : "Get the assistant GM's call";
 }
 const bindBeforeSimpleLab = bindPage;
 bindPage = function () {
@@ -176,23 +193,32 @@ bindPage = function () {
     error.hidden = true;
     c.player_id = Number(c.player_id || 0);
     c.override = f.has("override");
-    for (const k of ["send", "receive"])
-      c[k] = String(c[k] || "")
+    const ids = (v) =>
+      String(v || "")
         .split(",")
         .filter(Boolean)
         .map(Number);
+    for (const k of ["send", "receive"]) c[k] = ids(c[k]);
+    if (c.type === "Offers") {
+      c.offers = [1, 2, 3, 4]
+        .map((n) => ({ receive: ids(c["offer" + n]) }))
+        .filter((o) => o.receive.length);
+      [1, 2, 3, 4].forEach((n) => delete c["offer" + n]);
+    }
     const failure =
       ["Promotion", "Signing", "Extension"].includes(c.type) && !c.player_id
         ? "Choose a player from the name-search results."
         : c.type === "Trade" && (!c.send.length || !c.receive.length)
           ? "Choose at least one outgoing and one incoming player."
-          : null;
+          : c.type === "Offers" && (!c.send.length || c.offers.length < 2)
+            ? "Choose who's on the block and at least two offers."
+            : null;
     if (failure) {
       error.textContent = failure;
       error.hidden = false;
       return;
     }
-    if (!c.question)
+    if (!c.question && c.type !== "Offers")
       c.question =
         c.type === "Replacement"
           ? c.player_id
@@ -223,12 +249,7 @@ bindPage = function () {
       error.hidden = false;
     } finally {
       button.disabled = false;
-      button.textContent =
-        c.type === "Trade"
-          ? "Review this trade"
-          : c.type === "Deadline plan"
-            ? "Review our deadline options"
-            : "Get the department’s read";
+      button.textContent = buttonLabel(c.type);
     }
   };
 };

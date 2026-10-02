@@ -1381,7 +1381,8 @@ bindPage = function () {
         S[key] = e.target.value;
         render();
       };
-  for (const side of ["send", "receive"]) packagePicker(side);
+  for (const side of ["send", "receive", "offer1", "offer2", "offer3", "offer4"])
+    packagePicker(side);
   if ($("#case-player"))
     $("#case-player").onchange = (e) => {
       const p = S.labPlayers?.find((p) => p.id === Number(e.target.value));

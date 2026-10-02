@@ -2146,3 +2146,58 @@ summary:focus-visible {
   color: var(--muted);
   margin: -2px 0 6px;
 }
+
+/* Comparing trade offers */
+.offers-word {
+  font-size: 30px;
+  text-transform: none;
+}
+.offer-reasons {
+  margin: 0 0 14px;
+  padding-left: 18px;
+}
+.offer-reasons li {
+  margin-bottom: 6px;
+}
+.offer-best td {
+  background: var(--paper);
+  font-weight: 600;
+}
+.call-chip {
+  --call: var(--gold);
+  display: inline-block;
+  padding: 2px 8px;
+  border: 1px solid var(--call);
+  border-radius: 999px;
+  color: var(--call);
+  font-size: 12px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+.call-chip.call-go {
+  --call: var(--green);
+}
+.call-chip.call-no {
+  --call: var(--red);
+}
+.call-chip.call-stop {
+  --call: #7a1e2a;
+}
+.offer-tag {
+  display: inline-block;
+  margin: 0 4px 4px 0;
+  padding: 2px 7px;
+  background: var(--paper);
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  font-size: 12px;
+  white-space: nowrap;
+}
+.offer-detail {
+  margin-bottom: 12px;
+}
+.offer-detail > summary {
+  cursor: pointer;
+  font-weight: 600;
+  padding: 10px 0;
+}

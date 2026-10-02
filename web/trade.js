@@ -2,6 +2,7 @@
 // The assistant GM's call card for every Decision Lab question that has one.
 const caseReportBeforeTrade = caseReport;
 caseReport = function (r) {
+  if (r.type === "Offers") return offersReport(r);
   if (r.trade_review) return tradeReport(r);
   if (r.call) return callCard(r) + seeTheNumbers(caseReportBeforeTrade(r));
   return (
@@ -62,6 +63,32 @@ function callCard(r) {
     ${c.make_it_work ? `<p class="make-it-work"><strong>What would make it work:</strong> ${esc(c.make_it_work)}</p>` : ""}
     <small class="call-foot">Value = projected wins × ${worth(c.price_of_a_win)} a win (what this league pays) − salary, over the years we control each player. Make the move in OOTP.</small>
   </section>`;
+}
+
+// Several offers for the same player(s): one verdict, a ranked table, then each offer's full card.
+function offersReport(r) {
+  const v = r.verdict;
+  const salary = (c) =>
+    !c.salary_change
+      ? "No change"
+      : c.salary_change < 0
+        ? `Saves ${worth(-c.salary_change)}`
+        : `Adds ${worth(c.salary_change)}`;
+  const rows = r.offers.map(
+    (o, i) =>
+      `<tr class="${i === 0 ? "offer-best" : ""}"><td>${i + 1}</td><td><strong>${esc(o.label)}</strong><small>${o.call.get_players.map((p) => esc(p.name)).join(", ")}</small></td><td><span class="call-chip call-${CALL_STYLE[o.call.call] || "maybe"}">${esc(o.call.call)}</span></td><td>${worth(o.call.get)}</td><td>${o.call.wins_now > 0 ? "+" : ""}${fmt(o.call.wins_now, 1)}</td><td>${salary(o.call)}</td><td>${o.tags.map((t) => `<span class="offer-tag">${esc(t)}</span>`).join("")}</td></tr>`,
+  );
+  const detail = (o, i) =>
+    `<details class="offer-detail"><summary>${i + 1}. ${esc(o.label)}: ${esc(o.call.call)}${o.call.call.endsWith("...") ? "" : "."} ${esc(o.call.headline)}</summary>${callCard({ call: o.call, game_date: r.game_date })}${seeTheNumbers(analyticsReview({ trade_review: o.trade_review, call: o.call, checks: [], package: { flags: [] } }))}</details>`;
+  return (
+    `<section class="panel call-card call-${CALL_STYLE[v.call] || "maybe"}">
+      <div class="call-top"><span class="eyebrow">Assistant GM · ${esc(r.scenario_mode)} · ${date(r.game_date)} · On the block: ${r.on_the_block.map((p) => esc(p.name)).join(", ")} (${worth(r.give)})</span>
+        <h2 class="call-word offers-word">${esc(v.headline)}</h2></div>
+      <ul class="offer-reasons">${v.reasons.map((x) => `<li>${esc(x)}</li>`).join("")}</ul>
+      ${table(["#", "Offer", "Call", "Value we get", "Wins this year", "Salary", ""], rows)}
+      <small class="call-foot">Ranked by value to us, with extra weight on this season's wins while contending. Open any offer for the full read.</small>
+    </section>` + r.offers.map(detail).join("")
+  );
 }
 
 // Saved before the assistant GM existed: show the old heuristic verdict as it was.

@@ -424,6 +424,7 @@ class ValueEngine:
             "chance_develops": round(chance, 2),
             "seasons": [{k: v for k, v in s.items() if k != "weight"} for s in up],
             "free_agent": p["free_agent"],
+            "age": int(number(p["age"])),
         }
         result["risk"] = (
             "Proven" if chance == 1 else "Still developing" if level == 1 else "Prospect"

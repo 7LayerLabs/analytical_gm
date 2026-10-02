@@ -1613,6 +1613,29 @@ def evaluate(d, case):
     p = d.by_id.get(pid)
     override = bool(case.get("override"))
     protected = {l["player_id"] for l in o.state["locks"] if l["scope"] == "trade"}
+    if kind == "Offers":
+        from offers import compare_offers
+
+        send = [int(i) for i in case.get("send", [])]
+        if protected.intersection(send) and not override:
+            raise ValueError(
+                "A player on the block is trade-protected. Keep the lock or compare an unlocked "
+                "scenario; standing locks remain unchanged."
+            )
+        mode = case.get("scenario_mode") or o.b["seasons"].get(str(d.year))
+        if mode not in MODES:
+            raise ValueError("Unknown scenario direction.")
+        report = compare_offers(o, send, case.get("offers", []), mode)
+        block = ", ".join(d.by_id[i]["name"] for i in send)
+        report.update(
+            question=case.get("question") or f"Which offer for {block} should we take?",
+            game_date=d.manifest["game_date"],
+            snapshot=d.sid,
+            locks_respected=not override,
+            alternatives=[],
+            checks=["Make the trade in OOTP; saving this comparison does not move players."],
+        )
+        return report
     if kind not in ["Replacement", "Promotion", "Signing", "Trade", "Extension", "Deadline plan"]:
         raise ValueError("Choose a supported decision type.")
     pos = case.get("position") or (p["position"] if p else "P")
