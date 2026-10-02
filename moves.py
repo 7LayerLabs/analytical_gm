@@ -84,7 +84,7 @@ class Moves:
     def where(self, p):
         level = self.e.level(p) or 1
         if level == 1:
-            return "Boston"
+            return "Boston" if p["team_id"] == self.d.team else self.d.team_name(p["team_id"])
         return f"{LEVELS.get(level, 'minors')} {self.d.team_name(p['team_id'])}".strip()
 
     def can_play(self, p, pos):
@@ -120,6 +120,9 @@ class Moves:
         if not here:
             return "no stats this year"
         text = stat_text(p, here)
+        key, floor = ("outs", 30) if p["kind"] == "pit" else ("pa", 50)
+        if number(here.get(key)) < floor:
+            text += " (small sample)"
         if elsewhere:
             text += f". Also {LEVELS.get(elsewhere['level'], elsewhere['league'])}: {stat_text(p, elsewhere, short=True)}"
         if p.get("day_to_day"):

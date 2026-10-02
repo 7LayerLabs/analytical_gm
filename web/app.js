@@ -336,6 +336,7 @@ async function players() {
       "Plain-language assessments, the supporting evidence, and the contract that comes with the talent.",
       "SCOUTING DEPARTMENT",
     ) +
+    scoutPanel() +
     `<div class="filters"><input id="player-search" type="search" placeholder="Find a player" aria-label="Find a player" value="${esc(F.q)}"><select id="scope" aria-label="Player group">${[
       ["organization", "Our organization"],
       ["active", "Healthy active"],
@@ -1319,7 +1320,7 @@ function packagePicker(side) {
   el.type = "hidden";
   const wrap = document.createElement("div");
   wrap.className = "packagepicker";
-  wrap.innerHTML = `<input type="search" id="${side}-search" placeholder="Search ${side === "send" ? "our players" : "outside targets"} by name" aria-label="${side === "send" ? "Outgoing" : "Incoming"} player search"><div id="${side}-matches"></div><div id="${side}-chips"></div>`;
+  wrap.innerHTML = `<input type="search" id="${side}-search" placeholder="Search ${side === "send" ? "our players" : side === "scout" ? "any player" : "outside targets"} by name" aria-label="${side === "send" ? "Outgoing" : "Incoming"} player search"><div id="${side}-matches"></div><div id="${side}-chips"></div>`;
   el.parentElement.append(wrap);
   let generation = 0;
   const selected = [];
@@ -1338,7 +1339,10 @@ function packagePicker(side) {
       });
       if (gen !== generation) return;
       $(`#${side}-matches`).innerHTML = r.players
-        .filter((p) => side === "send" || p.organization_id !== S.status.snapshot.team_id)
+        .filter(
+          (p) =>
+            side === "send" || side === "scout" || p.organization_id !== S.status.snapshot.team_id,
+        )
         .map(
           (p) =>
             `<button type="button" data-package-player="${p.id}">${esc(p.name)} · ${esc(p.team)}</button>`,
@@ -1390,7 +1394,7 @@ bindPage = function () {
         S[key] = e.target.value;
         render();
       };
-  for (const side of ["send", "receive", "offer1", "offer2", "offer3", "offer4"])
+  for (const side of ["send", "receive", "offer1", "offer2", "offer3", "offer4", "scout"])
     packagePicker(side);
   if ($("#case-player"))
     $("#case-player").onchange = (e) => {

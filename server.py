@@ -132,6 +132,11 @@ class Handler(BaseHTTPRequestHandler):
                         return self.send(organizational_direction(o))
                     if route == "home":
                         return self.send(o.home())
+                    if route == "scout":
+                        from scout import scout_players
+
+                        ids = [int(x) for x in param("ids").split(",") if x.strip()]
+                        return self.send(scout_players(o, ids))
                     if route == "moves":
                         from moves import suggested_moves
 
@@ -278,6 +283,7 @@ class Handler(BaseHTTPRequestHandler):
                 "/direction.js": "direction.js",
                 "/owner.js": "owner.js",
                 "/trade.js": "trade.js",
+                "/scout.js": "scout.js",
             }
             if path not in assets:
                 return self.send({"error": "Not found"}, 404)
@@ -323,6 +329,10 @@ class Handler(BaseHTTPRequestHandler):
                 )
             if path == "/api/jev/forget":
                 return self.send(jev.forget())
+            if path == "/api/jev/ask":
+                from jev_reads import ask
+
+                return self.send(ask(Office(department()), str(body.get("topic", "")), body))
             if path == "/api/jev/review":
                 return self.send(jev.review(department(), int(body["id"])))
             if path == "/api/scenario":

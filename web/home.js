@@ -115,5 +115,9 @@ function moveCard(m) {
         `<tr><td>${link(c)}<small>${esc(c.role)} · ${esc(c.where)} · age ${c.age}${c.options ? " · " + esc(c.options) : ""}</small></td><td>${esc(c.line)}<small>${esc(c.tools)}</small></td><td class="num">${fmt(c.wins, 1)}</td></tr>`,
     ),
   );
-  return `<section class="move-card move-${style}"><div class="move-head"><span class="call-chip call-${style}">${esc(m.call)}</span><h3>${esc(m.title)}</h3>${gain}</div><p>${esc(m.why)}</p><ol class="move-chain">${m.chain.map((x) => `<li>${esc(x)}</li>`).join("")}</ol>${comps}</section>`;
+  const prospect = m.comps.find((c) => MINORS.test(c.where));
+  const jev = prospect
+    ? `<div class="actions">${jevButton("prospect", { id: prospect.id }, `Ask Jev: is ${prospect.name}'s run real?`)}</div>`
+    : "";
+  return `<section class="move-card move-${style}"><div class="move-head"><span class="call-chip call-${style}">${esc(m.call)}</span><h3>${esc(m.title)}</h3>${gain}</div><p>${esc(m.why)}</p><ol class="move-chain">${m.chain.map((x) => `<li>${esc(x)}</li>`).join("")}</ol>${comps}${jev}</section>`;
 }

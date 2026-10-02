@@ -58,9 +58,11 @@ function callCard(r) {
       <h2 class="call-word">${esc(c.call)} <small>${c.strength === "strong" ? "Strong call" : "Lean"}</small></h2>
       <p class="call-headline">${esc(c.headline)}</p></div>
     ${ledger.length ? `<div class="ledger">${ledger.map(side).join("")}</div>` : ""}
+    ${valueMath(c)}
     <div class="procon"><div><h3>Why it helps</h3>${items(c.pros, "Nothing.")}</div><div><h3>What it costs us</h3>${items(c.cons, "Nothing that matters.")}</div></div>
     ${c.roster?.length ? `<div class="call-roster"><h3>On the field</h3>${items(c.roster, "")}</div>` : ""}
     ${c.make_it_work ? `<p class="make-it-work"><strong>What would make it work:</strong> ${esc(c.make_it_work)}</p>` : ""}
+    ${c.give_players && c.get_players ? `<div class="actions">${jevButton("trade", { send: c.give_players.map((p) => p.id), receive: c.get_players.map((p) => p.id), mode: c.mode }, "Ask Jev for a second opinion")}</div>` : ""}
     <small class="call-foot">Value = projected wins × ${worth(c.price_of_a_win)} a win (what this league pays) − salary, over the years we control each player. Make the move in OOTP.</small>
   </section>`;
 }
@@ -89,6 +91,31 @@ function offersReport(r) {
       <small class="call-foot">Ranked by value to us, with extra weight on this season's wins while contending. Open any offer for the full read.</small>
     </section>` + r.offers.map(detail).join("")
   );
+}
+
+// Show the work behind every dollar figure on a trade card.
+function valueMath(c) {
+  const players = [...(c.give_players || []), ...(c.get_players || [])].filter((p) => p.seasons);
+  if (!players.length) return "";
+  const block = (p) =>
+    `<h4>${esc(p.name)}: ${worth(p.value)}</h4>${
+      p.seasons.length
+        ? table(
+            [
+              "Season",
+              "Projected wins",
+              "Worth at this league's price",
+              "His salary",
+              "Value to us",
+            ],
+            p.seasons.map(
+              (s) =>
+                `<tr><td>${s.year}${s.partial ? " (rest of year)" : ""}${s.status === "minors" ? " · minors" : s.status.startsWith("arbitration") ? " · arbitration (est.)" : ""}</td><td class="num">${fmt(s.wins, 1)}</td><td class="num">${worth(s.market)}</td><td class="num">${worth(s.salary)}</td><td class="num">${worth(s.value)}</td></tr>`,
+            ),
+          )
+        : `<p>${esc(p.summary)}</p>`
+    }`;
+  return `<details class="value-math"><summary>How we figure these values</summary><p>Each player's value is <strong>projected wins × ${worth(c.price_of_a_win)} a win</strong> (what this league pays veterans) <strong>minus his salary</strong>, for every season we'd control him. Wins come from his ratings, blended with his real big-league results the longer he's played; young players grow toward their potential and veterans age on this league's curve. Future seasons count a little less (5% a year) and prospects are weighted by their chance to develop, so the totals won't exactly match the rows.</p>${players.map(block).join("")}</details>`;
 }
 
 // Saved before the assistant GM existed: show the old heuristic verdict as it was.

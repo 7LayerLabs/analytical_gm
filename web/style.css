@@ -2318,3 +2318,124 @@ summary:focus-visible {
   color: white;
   border-color: var(--navy);
 }
+
+/* Scout & fit */
+.scout-card {
+  padding: 16px 18px;
+}
+.scout-card header h3 {
+  margin: 0;
+}
+.scout-card header small {
+  color: var(--muted);
+}
+.scout-verdict {
+  font-weight: 700;
+  font-size: 16px;
+  margin: 10px 0 4px;
+}
+.scout-grid {
+  display: grid;
+  grid-template-columns: minmax(220px, 1fr) 2fr;
+  gap: 18px;
+}
+.scout-grid h4,
+.scout-facts dt {
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--muted);
+  margin: 8px 0 4px;
+}
+.tool-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+.tool-list li {
+  display: grid;
+  grid-template-columns: 1fr 90px 44px;
+  align-items: center;
+  gap: 8px;
+  padding: 2px 0;
+}
+.tool-list meter {
+  width: 90px;
+}
+.scout-history {
+  padding-left: 16px;
+  margin: 0;
+}
+.scout-facts {
+  display: grid;
+  grid-template-columns: 110px 1fr;
+  gap: 2px 12px;
+  margin: 10px 0;
+}
+.scout-facts dd {
+  margin: 8px 0 4px;
+}
+/* Ask Jev */
+.jev-slot {
+  display: inline-flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.jev-slot > small,
+.jev-ask small {
+  color: var(--muted);
+}
+.jev-button {
+  border-style: dashed;
+}
+.jev-reads {
+  border: 1px solid var(--line);
+  border-left: 4px solid var(--blue);
+  background: var(--paper);
+  padding: 10px 12px;
+  margin-top: 8px;
+}
+.jev-read {
+  display: grid;
+  grid-template-columns: minmax(160px, 1fr) minmax(140px, 2fr) 90px 90px;
+  gap: 8px;
+  align-items: center;
+  padding: 4px 0;
+}
+.jev-read small {
+  color: var(--muted);
+}
+.jev-read.agree strong {
+  color: var(--green);
+}
+.jev-read.disagree strong {
+  color: var(--red);
+}
+.jev-note {
+  display: block;
+  color: var(--muted);
+  margin-top: 6px;
+}
+.jev-ask label {
+  display: block;
+}
+@media (max-width: 760px) {
+  .scout-grid,
+  .scout-facts,
+  .jev-read {
+    grid-template-columns: 1fr;
+  }
+}
+
+.value-math {
+  margin: 0 0 14px;
+}
+.value-math > summary {
+  cursor: pointer;
+  font-weight: 600;
+  color: var(--blue);
+  padding: 4px 0;
+}
+.value-math h4 {
+  margin: 12px 0 4px;
+}

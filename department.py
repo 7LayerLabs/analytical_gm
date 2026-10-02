@@ -194,9 +194,10 @@ class Department:
 
     def team_name(self, tid):
         t = self.teams.get(tid, {})
-        return (str(t.get("name", "")) + " " + str(t.get("nickname", ""))).strip() or (
-            "Free agent" if not tid else str(tid)
-        )
+        name, nickname = str(t.get("name", "")), str(t.get("nickname", ""))
+        if nickname == name:  # "Athletics Athletics"
+            nickname = ""
+        return (name + " " + nickname).strip() or ("Free agent" if not tid else str(tid))
 
     def salary_schedule(self, c):
         # salary0 is first contract year, season_year is starting year; current_year is a zero-based index.
