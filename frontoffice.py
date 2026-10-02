@@ -76,11 +76,11 @@ def assignment(scores):
     return result
 
 def default_state(d):
-    return {'blueprint':{'seasons':{str(d.year):'Win now',str(d.year+1):'Win now',str(d.year+2):'Hold & evaluate'},'goal':'Make the playoffs; build a club capable of winning the World Series','identities':[], 'philosophy':'Blended','playing_notes':'','style_source':[],'style_overrides':[],'skills':{s:'Preferred' for s in SKILLS},'boundaries':'Protect next season’s contender; assess cost before trading long-term core players.','reason':'Opening team plan','cadence':'Weekly'},'versions':[],'locks':[],'watchlist':[],'decisions':[],'checkpoints':[]}
+    return {'blueprint':{'seasons':{str(d.year):'Win now',str(d.year+1):'Win now',str(d.year+2):'Hold & evaluate'},'goal':'Make the playoffs; build a club capable of winning the World Series','identities':[], 'philosophy':'Blended','playing_notes':'','style_source':[],'style_overrides':[],'skills':{s:'Preferred' for s in SKILLS},'boundaries':'Protect next season’s contender; assess cost before trading long-term core players.','reason':'Opening team plan','cadence':'Weekly'},'versions':[],'locks':[],'watchlist':[],'decisions':[],'checkpoints':[],'owner_goals':{},'owner_goal_history':[]}
 
 def state_path(d):return DATA/f'frontoffice-team{d.team}-league{d.league}.json'
 def office_state(d):
-    base=default_state(d);saved=read_json(state_path(d),base);saved['blueprint']={**base['blueprint'],**saved['blueprint']};return saved
+    base=default_state(d);saved=read_json(state_path(d),base);saved={**base,**saved};saved['blueprint']={**base['blueprint'],**saved['blueprint']};return saved
 def stamp(d):return {'id':secrets.token_hex(8),'created_at':datetime.now(timezone.utc).isoformat(),'snapshot':d.sid,'game_date':str(d.manifest['game_date'])}
 
 def save(d,body):
@@ -101,6 +101,11 @@ def save(d,body):
                 if value not in ['Essential','Preferred','Optional']:raise ValueError('Invalid skill priority.')
             if len(b['identities'])!=len(set(b['identities'])):raise ValueError('Choose each identity once.')
             s['versions'].insert(0,{**stamp(d),'before':s['blueprint'],'blueprint':b});s['blueprint']=b
+        elif action=='owner-goals':
+            from owner_goals import validate_goals,capture_baseline
+            year,entry=validate_goals(body);before=s['owner_goals'].get(str(year),{})
+            entry['baseline']=before.get('baseline') or (capture_baseline(Office(d)) if year==d.year else {})
+            entry.update(stamp(d));s['owner_goal_history'].insert(0,{**stamp(d),'year':year,'before':before,'after':entry});s['owner_goals'][str(year)]=entry
         elif action=='lock':
             pid=int(body['player_id']);p=d.by_id.get(pid)
             if not p or p not in d.own():raise ValueError('Lock a player in your organization.')
@@ -409,7 +414,10 @@ class Office:
         roster=self.roster();incumbents={x['position']:x['player'] for x in roster['lineup']}
         for role,rs in [('SP',roster['rotation']),('RP',roster['bullpen'])]:
             people=[x['player'] for x in rs if x['player']];incumbents[role]=min(people,key=lambda p:p['grade']) if people else None
-        weak={k for k,v in sorted(incumbents.items(),key=lambda x:x[1]['grade'] if x[1] else -1)[:4]};weak.add('SP')
+        from owner_goals import owner_context
+        owner=owner_context(self)
+        owner_positions={g['position'] for g in owner['goals'] if g['category']=='Position upgrade' and g['position']}
+        weak={k for k,v in sorted(incumbents.items(),key=lambda x:x[1]['grade'] if x[1] else -1)[:4]};weak.add('SP');weak.update(owner_positions)
         for p in ranked:
             table='players_batting' if p['kind']=='bat' else 'players_pitching';raw=d.by_id[p['id']];m=market_context(p,d.ratings['players_value'].get(p['id'],{}),d.ratings[table].get(p['id'],{}),d.ratings['players_fielding'].get(p['id'],{}),number(d.leagues[d.league].get('rules_fa_minimum_years'),6))
             role=('SP' if self.role(raw)=='Starters' else 'RP') if p['kind']=='pit' else p['position'];inc=incumbents.get(role);delta=round(p['grade']-inc['grade'],1) if inc else None
@@ -417,7 +425,7 @@ class Office:
             p['acquisition']=m
         premium=[p for p in ranked if p['acquisition']['premium']]
         practical=[p for p in ranked if not p['acquisition']['premium'] and p['acquisition']['need'] and p['acquisition']['upgrade'] and not p['injured'] and not p['on_dl']]
-        practical.sort(key=lambda p:(p['free_agent'],p['grade']),reverse=True)
+        practical.sort(key=lambda p:(p['free_agent'],p['acquisition']['role'] in owner_positions,p['grade']),reverse=True)
         protected={l['player_id'] for l in self.state['locks'] if l['scope']=='trade'}
         selling=[self.card(p) for p in d.own() if p['salary_known'] and p['id'] not in protected and (not any(r['year']>d.year for r in self.contract_schedule(p)) or (self.b['seasons'].get(str(d.year+1))=='Rebuild'))]
         selling.sort(key=lambda x:(x['years_left'], -x['grade']))
@@ -439,7 +447,7 @@ class Office:
                 if number(r.get('pitching_ratings_overall_control'))>=7:signals.append('Control ≥7/10; check strikeout and HR prevention alongside it.')
             if signals:edges.append({'player':p,'signals':signals,'status':'Research signal — price edge unproven'})
         edges.sort(key=lambda x:(len(x['signals']),x['player']['grade'],-x['player']['salary']),reverse=True)
-        return {'players':practical,'all_players':ranked,'premium':premium,'internal':[{**incumbents[k],'comparison_role':k} for k in (['SP','RP'] if position=='P' else [position] if position else sorted(weak)) if incumbents.get(k)],'selling':selling,'edges':edges[:20],'trade_block':'Unverified: trade_status exists in the CSV, but its code-to-availability mapping has not been confirmed. Other-club players below are research targets, not declared available.','edge':'Edgehunter hypotheses: strong OBP ratings, useful platoon skills or park-fit gap power. Confirm asking price, development cost and replacement value before calling any player a bargain.'}
+        return {'owner_goals':owner,'players':practical,'all_players':ranked,'premium':premium,'internal':[{**incumbents[k],'comparison_role':k} for k in (['SP','RP'] if position=='P' else [position] if position else sorted(weak)) if incumbents.get(k)],'selling':selling,'edges':edges[:20],'trade_block':'Unverified: trade_status exists in the CSV, but its code-to-availability mapping has not been confirmed. Other-club players below are research targets, not declared available.','edge':'Edgehunter hypotheses: strong OBP ratings, useful platoon skills or park-fit gap power. Confirm asking price, development cost and replacement value before calling any player a bargain.'}
 
     def development(self):
         d=self.d;dev=d.development();prospects=dev['prospects'];draft=[p for p in d.profiles if p['draft_eligible']];depth=collections.Counter(p['position'] for p in d.own() if p['team_id']!=d.team)
@@ -478,7 +486,8 @@ def evaluate(d,case):
     if not 1<=assumptions['offer_years']<=15 or not 0<=assumptions['annual_offer']<=100000000 or not 0<=assumptions['added_service_days']<=172:raise ValueError('Use valid offer years, salary and service-day assumptions.')
     mode=assumptions['scenario_mode']
     if mode not in MODES:raise ValueError('Unknown scenario direction.')
-    base={'type':kind,'question':case.get('question') or f'{kind}: {p["name"] if p else pos}','blueprint':o.b,'scenario_mode':mode,'assumptions':assumptions,'snapshot':d.sid,'game_date':d.manifest['game_date'],'alternatives':[],'checks':['Verify current roster, options and injury status in OOTP.','Confirm the financial screen and asking price before agreeing.'],'locks_respected':not override,'recommendation':'No clear winner until cost and availability are confirmed.'}
+    from owner_goals import owner_context
+    base={'owner_goals':owner_context(o),'type':kind,'question':case.get('question') or f'{kind}: {p["name"] if p else pos}','blueprint':o.b,'scenario_mode':mode,'assumptions':assumptions,'snapshot':d.sid,'game_date':d.manifest['game_date'],'alternatives':[],'checks':['Verify current roster, options and injury status in OOTP.','Confirm the financial screen and asking price before agreeing.'],'locks_respected':not override,'recommendation':'No clear winner until cost and availability are confirmed.'}
     base['alternatives'].append({'name':'Do nothing','summary':'Keep current assignments and commitments. Avoid acquisition cost, but leave the identified need unresolved.'})
     if kind=='Trade':
         send=[int(i) for i in case.get('send',[])];recv=[int(i) for i in case.get('receive',[])];blocked=protected.intersection(send)

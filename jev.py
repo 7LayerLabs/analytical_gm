@@ -85,6 +85,9 @@ def review(dept,pid):
     state={'player':player,'ratings':{k:v for k,v in p['ratings'].items() if k!='players_value'},
            'evidence_notes':p['why'],'projection_caveat':p['projection']['caveat'],
            'role_context':'Evaluate a baseball role; imported position and role codes are not interpreted as proof of ideal usage.'}
+    from owner_goals import owner_context
+    from frontoffice import Office
+    state['owner_priorities']=owner_context(Office(dept))
     body={'model':status()['model'],'state':state,'questions':qs}
     fingerprint=hashlib.sha256(json.dumps({'request':body,'snapshot':dept.sid,'rubric':RUBRIC_VERSION},sort_keys=True).encode()).hexdigest()
     path=DATA/'jev-reviews'/f'{fingerprint}.json'

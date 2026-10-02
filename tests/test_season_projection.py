@@ -73,6 +73,8 @@ class LiveSeasonProjection(unittest.TestCase):
 
     def progressed(self,complete=False):
         m=copy.copy(self.m);m.games=copy.deepcopy(self.m.games);m.records={tid:{'w':0,'l':0} for tid in m.clubs}
+        # Synthetic progression starts from a clean schedule even when the live save is midseason.
+        for g in m.games:g['played']=0
         played=m.games if complete else m.games[:35]
         for g in played:
             g['played']=1;m.records[g['home_team']]['w']+=1;m.records[g['away_team']]['l']+=1
