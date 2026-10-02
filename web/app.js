@@ -1,65 +1,1477 @@
-'use strict';
-const $=(q,r=document)=>r.querySelector(q),$$=(q,r=document)=>[...r.querySelectorAll(q)];
-const esc=x=>String(x??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-const fmt=(n,d=0)=>n==null?'—':Number(n).toLocaleString('en-US',{minimumFractionDigits:d,maximumFractionDigits:d}),money=n=>n==null?'Not exported':new Intl.NumberFormat('en-US',{style:'currency',currency:'USD',maximumFractionDigits:0}).format(n),cash=n=>n==null?'—':Math.abs(n)>=1e6?'$'+(n/1e6).toFixed(1)+'m':money(n),rate=n=>n==null?'—':Number(n).toFixed(3).replace(/^0/,''),pct=n=>n==null?'—':fmt(n*100,1)+'%',date=n=>n?String(n).slice(0,10):'—';
-let S={status:null,office:null,page:'home',snapshot:'',offset:0,tab:'Overview',hand:'vsr',internal:false,free:false,position:'',draft:false,leagueTab:'Leaders',role:'Hitters',stat:'Contact',generation:0},F={scope:'organization',q:'',kind:'',sort:'grade',direction:'desc'};
-async function api(path,params={},body){const q=new URLSearchParams(params);if(S.snapshot&&!body&&!['/api/status','/api/journal'].includes(path))q.set('snapshot',S.snapshot);const r=await fetch(path+(q.size?'?'+q:''),body?{method:'POST',headers:{'Content-Type':'application/json','X-GM-Request':'1'},body:JSON.stringify(body)}:{});const v=await r.json();if(!r.ok)throw Error(v.error||'Request failed');return v;}
-function toast(t){$('#toast').textContent=t;$('#toast').hidden=false;clearTimeout(S.toast);S.toast=setTimeout(()=>$('#toast').hidden=true,6500);}
-const badge=(s,c='')=>`<span class="badge ${c}">${esc(s)}</span>`,note=(s,w=false)=>`<div class="note ${w?'warn':''}">${esc(s)}</div>`,empty=s=>`<div class="empty">${esc(s)}</div>`,panel=(title,body,extra='')=>`<section class="panel"><div class="panelhead"><h2>${esc(title)}</h2>${extra}</div><div class="panelbody">${body}</div></section>`,head=(title,sub,tag='FRONT OFFICE')=>`<div class="pagehead"><div><span class="eyebrow">${esc(tag)}</span><h1>${esc(title)}</h1><p>${esc(sub)}</p></div></div>`,metric=(l,v,s='')=>`<div class="metric"><label>${esc(l)}</label><strong>${v}</strong><small>${esc(s)}</small></div>`,link=p=>p.report_available===false?`<span class="player-name" title="Historical player outside the current scouting cohort">${esc(p.name)}</span>`:`<button class="player-name" data-player="${p.id}">${esc(p.name)}</button>`,salary=p=>p.salary_known?cash(p.salary):p.free_agent?'Asking price unknown':'Salary not exported';
-const bar=g=>`<span class="gradebar" role="img" aria-label="Department grade ${fmt(g,1)} of 10">${Array.from({length:10},(_,i)=>`<i class="${i<Math.round(g)?g>=6?'on':'mid':''}"></i>`).join('')}</span>`;
-const tabs=(values,selected,attr)=>`<div class="tabs">${values.map(x=>`<button ${attr}="${esc(x)}" class="${selected===x?'selected':''}">${esc(x)}</button>`).join('')}</div>`,options=(vs,selected)=>vs.map(x=>`<option value="${esc(x)}" ${x===selected?'selected':''}>${esc(x)}</option>`).join('');
-function table(headers,rs){return `<div class="tablewrap"><table><thead><tr>${headers.map(x=>`<th>${esc(x)}</th>`).join('')}</tr></thead><tbody>${rs.join('')}</tbody></table></div>`;}
-function rows(ps,limit=ps.length){return ps.length?`<div class="panel playerrows">${ps.slice(0,limit).map((p,i)=>`<article class="row"><span class="rank">${i+1}</span><span class="avatar">${esc(p.name.split(' ').map(n=>n[0]).slice(0,2).join(''))}</span><div><div class="rowmeta">${link(p)}${badge(p.position)}<small>${esc(p.team)} · ${p.age} · ${esc(p.bats)}/${esc(p.throws)}</small>${p.injured||p.on_dl?badge('Injured','red'):''}${p.locks?.length?badge('Locked','gold'):''}</div><p class="assessment">${esc(p.summary)}</p>${bar(p.grade)}<ul class="evidence"><li>${p.kind==='bat'?`Forecast ${rate(p.projection.ops)} OPS · ${rate(p.projection.obp)} OBP`:`Forecast ${fmt(p.projection.fip,2)} FIP · ${pct(p.projection.k_pct)} K`} · ${esc(p.projection.evidence)} evidence</li><li>${esc(p.fit.notes[0])}</li></ul></div><div class="rowright"><div class="big">${fmt(p.grade,1)}<small>department / 10</small></div><b>${salary(p)}</b><small>${p.end_year?'Through '+p.end_year+' · '+p.years_left+' seasons':'Contract needs review'}</small><button data-watch="${p.id}">+ Watch</button></div></article>`).join('')}</div>`:empty('No players match this view.');}
-function diamond(lineup){const xy={C:[230,255],'1B':[370,194],'2B':[304,124],'3B':[90,194],SS:[156,124],LF:[75,58],CF:[230,33],RF:[385,58]};return `<svg class="diamond" viewBox="0 0 460 300" role="img" aria-label="Suggested defensive alignment"><path class="outfield" d="M230 270 L25 110 Q230 -75 435 110 Z"/><polygon class="infield" points="230,267 120,180 230,98 340,180"/>${[[230,260],[122,180],[230,100],[338,180]].map(([x,y])=>`<rect class="base" x="${x-4}" y="${y-4}" width="8" height="8" transform="rotate(45 ${x} ${y})"/>`).join('')}${Object.entries(xy).map(([pos,[x,y]])=>{const p=lineup.find(a=>a.position===pos)?.player;return `<a href="#players" ${p?`data-player="${p.id}"`:''}><text class="pos" x="${x}" y="${y}" text-anchor="middle">${pos}</text><text x="${x}" y="${y+17}" text-anchor="middle">${esc(p?p.name.split(' ').slice(-1)[0]:'Open')}</text></a>`;}).join('')}</svg>`;}
-function rotation(r){return `<p class="assessment">${esc(r.shape)}</p>${r.rotation.map(x=>`<div class="rotationrow"><span class="rank">${x.slot}</span><div>${x.player?link(x.player):'Open slot'}<small>${x.locked?' · Locked':''}${x.player?' · stamina '+fmt(x.stamina):''}</small></div>${bar(x.player?.grade||0)}<strong>${fmt(x.player?.grade,1)}</strong></div>`).join('')}`;}
-function payrollChart(ys){const max=Math.max(1,...ys.map(x=>x.scheduled));return `<svg class="chart" viewBox="0 0 680 230" role="img" aria-label="Scheduled payroll with conditional option salaries"><line x1="30" y1="190" x2="660" y2="190"/>${ys.map((x,i)=>{const h=x.scheduled/max*145,ch=x.conditional/max*145,px=37+i*89;return `<rect x="${px}" y="${190-h}" width="58" height="${h}"><title>${x.year}: ${money(x.scheduled)}</title></rect><rect class="conditional" x="${px}" y="${190-h}" width="58" height="${ch}"><title>Conditional: ${money(x.conditional)}</title></rect><text x="${px+29}" y="${180-h}" text-anchor="middle">${cash(x.scheduled)}</text><text x="${px+29}" y="212" text-anchor="middle">${x.year}</text>`;}).join('')}</svg>`;}
-async function status(){const v=await api('/api/status'),prev=S.status?.snapshot?.id;S.status=v;const m=S.snapshot?v.snapshots.find(x=>x.id===S.snapshot):v.snapshot;$('#game-date').textContent=date(m?.game_date)+' · '+(S.snapshot?'Historical export':'Latest export');$('#snapshot-foot').textContent=m?'Captured '+new Date(m.created_at).toLocaleString():'';$('#snapshot-select').innerHTML='<option value="">Latest export</option>'+v.snapshots.map(x=>`<option value="${esc(x.id)}">${date(x.game_date)} · ${new Date(x.created_at).toLocaleTimeString()}</option>`).join('');$('#snapshot-select').value=S.snapshot;$('#refresh').disabled=v.import.running;$('#refresh').textContent=v.import.running?'Importing…':'Update Files';$('#notice').hidden=!v.import.error&&!v.import.running&&!S.snapshot;$('#notice').textContent=v.import.error||(v.import.running?v.import.message:'Historical view. Saved preferences and new decisions use the latest export.');if(prev&&prev!==v.snapshot?.id&&!S.snapshot){toast('New export imported. Reports updated.');render();}}
-async function render(){const gen=++S.generation;S.page=location.hash.slice(1)||'home';S.page=({briefing:'home',scenario:'lab',journal:'notebook',quality:'guide',connections:'guide'})[S.page]||S.page;$$('nav a').forEach(a=>a.classList.toggle('active',a.hash==='#'+S.page));$('#content').innerHTML='<div class="loading">Preparing your department’s report…</div>';try{S.office=await api('/api/office');const html=await({home,blueprint,owner,roster,players,acquisition,finances,development,readiness,direction,lab,league,notebook,guide}[S.page]||home)();if(gen!==S.generation)return;$('#content').innerHTML=html;bindPage();}catch(e){if(gen===S.generation)$('#content').innerHTML=`<div class="error"><h2>${S.status?.snapshot?'Could not open this report':'Connect your OOTP export'}</h2>${S.status?.snapshot?'':'<p>Copy game-access.example.json to game-access.json in the application folder. Set your CSV export folder, team ID and league ID, then choose Update Files. The README includes the setup steps.</p>'}<p>${esc(e.message)}</p><button data-retry>Try again</button></div>`;}}
-async function home(){const h=await api('/api/office/home');return head('Your club. Your next move.','The shape of your roster, and the decisions worth your attention.','BOSTON • '+date(S.status.snapshot.game_date))+`<div class="twocol"><div><article class="lead"><span class="eyebrow">THE DEPARTMENT’S READ</span><h2>${esc(h.summary)}</h2><p>${esc(h.blueprint.goal)}</p><div class="actions"><button data-nav="roster" class="primary">Build the best team today</button><button data-nav="lab">Open a decision</button></div></article><div class="metrics">${h.outlook.map(x=>metric(x.name,fmt(x.grade,1)+'/10',x.count+' healthy selected players')).join('')}${metric('Health flags',h.briefing.injured,'Across the organization')}</div><div class="columns">${panel('The starting five',rotation(h.roster),badge('Preference grades'))}${panel('On the field',diamond(h.roster.lineup),'<button data-nav="roster">Roster lab →</button>')}</div>${panel('Your attention list',h.briefing.items.slice(0,3).map(x=>`<div class="attention">${badge(x.priority,'gold')}<h3>${esc(x.title)}</h3><p>${esc(x.detail)}</p></div>`).join(''))}${note('Grades express preferences, not win probabilities. Check assignments in OOTP before using a suggested roster.')}</div><aside>${panel('The plan',`<span class="eyebrow">${S.status.snapshot.season}</span><h2>${esc(h.blueprint.seasons[S.status.snapshot.season])}</h2><p>${esc(h.blueprint.philosophy)} baseball</p><small>Next season: ${esc(h.blueprint.seasons[Number(S.status.snapshot.season)+1])}</small><p>${h.blueprint.identities.length?h.blueprint.identities.map(id=>badge(S.office.identities.find(x=>x.id===id).name)).join(' '):'Choose your baseball identity.'}</p><button data-nav="blueprint">Shape our identity →</button>`)}${ownerHome()}${seasonPrediction(h.prediction)}${panel('Since the last export',h.changes.items.map(x=>`<div class="feeditem"><strong>${esc(x.name)}</strong>${esc(x.change)}</div>`).slice(0,8).join('')||empty(h.changes.note))}${panel('Watching',h.watchlist.slice(0,5).map(x=>`<div class="feeditem">${link({id:x.player_id,name:x.name})}<p>${esc(x.reason)}</p><small>${esc(x.review)}</small></div>`).join('')||empty('Pin players to your watchlist from any report.'))}</aside></div>`;}
-async function blueprint(){const b=S.office.state.blueprint,y=S.status.snapshot.season;return head('Build a baseball identity.','Save this year’s direction, next year’s window and the reasons behind changes.','TEAM BLUEPRINT')+`<form id="blueprint-form">${panel('Our competitive window',`<div class="formgrid">${[y,y+1,y+2].map(yr=>`<label>${yr} direction<select name="season-${yr}">${options(S.office.modes,b.seasons[yr]||'Hold & evaluate')}</select></label>`).join('')}<label class="wide">The goal<textarea name="goal">${esc(b.goal)}</textarea></label></div>`)}${panel('How we build',`<div class="identitygrid">${S.office.identities.map(i=>`<label class="identity" title="${esc(i.priorities.join(' · '))}"><input type="checkbox" name="identity" value="${i.id}" ${b.identities.includes(i.id)?'checked':''}><strong>${esc(i.name)}</strong><small>${esc(i.tag)}</small><details ${b.identities.includes(i.id)?'open':''}><summary>Department priorities</summary><ul>${i.priorities.map(p=>`<li>${esc(p)}</li>`).join('')}</ul><p>${esc(i.tradeoff)}</p><p>${esc(i.history||'')}</p></details></label>`).join('')}</div><label>Primary identity<select name="primary"><option value="">Choose after selecting identities</option>${S.office.identities.map(i=>`<option value="${i.id}" ${b.identities[0]===i.id?'selected':''}>${esc(i.name)}</option>`).join('')}</select></label>`)}${panel('How we play',`<div class="formgrid"><label>Playing philosophy<select name="philosophy">${options(['Analytics-led','Traditional','Blended'],b.philosophy)}</select></label><label>Export review cadence<select name="cadence">${options(['Weekly','Biweekly','Monthly','As needed'],b.cadence)}</select></label><small>Traditional: speed first, strongest bat third, power fourth. Analytics-led and blended use platoon skill rankings with on-base ability near the top.</small></div><div class="skillsgrid">${S.office.skills.map(s=>`<label>${esc(s)}<select name="skill-${esc(s)}">${options(['Essential','Preferred','Optional'],b.skills[s])}</select></label>`).join('')}</div>${note('OBP/contact/power and strikeout/control priorities change grade weights. Defense, speed, depth, durability and versatility guide roster review; this is not a calibrated run-value model.')}`)}${panel('Guardrails & this version',`<div class="formgrid"><label class="wide">Budget, prospects and core-player boundaries<textarea name="boundaries">${esc(b.boundaries)}</textarea></label><label class="wide">Why save this plan?<textarea name="reason" required placeholder="Opening season plan, deadline pivot…"></textarea></label></div><button class="primary">Save team blueprint</button>`)} </form>${panel('Blueprint history',S.office.state.versions.map(v=>`<div class="feeditem"><strong>${date(v.game_date)} · ${esc(v.blueprint.reason)}</strong><details><summary>Saved version</summary><pre>${esc(JSON.stringify(v.blueprint,null,2))}</pre></details></div>`).join('')||empty('Your first saved plan starts the timeline.'))}`;}
-function lockList(){return S.office.state.locks.map(x=>`<div class="locklist"><strong>${esc(x.name)}</strong> ${badge(x.scope,'gold')}<small> ${esc(x.position)} ${x.slot?'slot '+x.slot:''} ${x.hand==='both'?'':esc(x.hand)}</small><p>${esc(x.reason||'Locked by the GM')}</p><button data-unlock="${x.id}">Approve removing this lock</button></div>`).join('')||empty('No standing locks. Add one from a player report or roster lab.');}
-async function roster(){const r=await api('/api/office/roster',{hand:S.hand,internal:S.internal?'1':'0'});return head('The best team today.','Healthy active players and organizational alternatives, shaped by matchups, defense and your locks.','ROSTER LAB')+`<div class="filters">${tabs(['vs right-handers','vs left-handers'],S.hand==='vsr'?'vs right-handers':'vs left-handers','data-hand')}<label><input id="internal" type="checkbox" ${S.internal?'checked':''}> Include healthy minor-league options</label><button data-lock-open>Add a binding lock</button></div>${r.warnings.map(x=>note(x,true)).join('')}<div class="twocol"><div><div class="columns">${panel('Defensive alignment',diamond(r.lineup))}${panel('Batting order',table(['Order','Player','Position','Grade'],r.lineup.map(x=>`<tr><td>${x.slot}</td><td>${link(x.player)} ${x.locked?badge('Locked','gold'):''}<small>${x.player.active?'':' · Internal alternative'}</small></td><td>${x.position}</td><td>${fmt(x.player.grade,1)}</td></tr>`)))}</div>${r.moves?rosterMovePlan(r.moves):''}${panel('Bench & roster coverage',table(['Player','Position','Grade'],r.bench.map(p=>`<tr><td>${link(p)}</td><td>${p.position}</td><td>${fmt(p.grade,1)}</td></tr>`)),badge(r.selected_count+' selected'))}${panel('Starting rotation & pitch limits',startingPitchPlan(r))}${panel('Bullpen roles & usage',bullpenRolePlan(r))}${r.unfilled.length?note('Unfilled: '+r.unfilled.join(', '),true):''}${note(r.method)}</div><aside>${panel('Binding locks',lockList())}${panel('Depth & coverage',r.depth.filter(x=>x.position!=='P').map(x=>`<div class="feeditem"><strong>${x.position} · ${x.players.length} active options</strong><small>Organization: ${x.reserves.map(p=>p.name).join(', ')||'No qualified healthy backup'}</small></div>`).join(''))}${panel('Promotion review','<p>Open an internal player for service time, 40-man status, options, contract and minor-league history.</p><button data-nav="lab">Promote or find outside help →</button>')}</aside></div>`;}
-async function players(){const r=await api('/api/office/players',{...F,offset:S.offset});return head('Read the player, not just the number.','Plain-language assessments, the supporting evidence, and the contract that comes with the talent.','SCOUTING DEPARTMENT')+`<div class="filters"><input id="player-search" type="search" placeholder="Find a player" aria-label="Find a player" value="${esc(F.q)}"><select id="scope" aria-label="Player group">${[['organization','Our organization'],['active','Healthy active'],['mlb','Current MLB'],['all','All players'],['draft','Draft eligible']].map(([v,t])=>`<option value="${v}" ${F.scope===v?'selected':''}>${t}</option>`).join('')}</select><select id="kind" aria-label="Player type">${[['','Hitters & pitchers'],['bat','Hitters'],['pit','Pitchers']].map(([v,t])=>`<option value="${v}" ${F.kind===v?'selected':''}>${t}</option>`).join('')}</select><select id="sort" aria-label="Sort">${[['grade','Department fit'],['engine_potential','Potential'],['salary','Salary'],['age','Age'],['name','Name']].map(([v,t])=>`<option value="${v}" ${F.sort===v?'selected':''}>${t}</option>`).join('')}</select><button id="direction">${F.direction==='desc'?'↓':'↑'}</button></div>${rows(r.players)}<div class="pagination"><small>${r.total} players · ${S.offset+1}–${Math.min(S.offset+12,r.total)}</small><div><button id="prev" ${S.offset===0?'disabled':''}>Previous</button> <button id="next" ${S.offset+12>=r.total?'disabled':''}>Next</button></div></div>`;}
-async function acquisition(){const r=await api('/api/office/acquisition',{free:S.free?'1':'0',position:S.position});S.targets=r;return head('Find the right help.','Compare outside possibilities with our depth before paying for a move.','ACQUISITION DESK')+`<div class="filters"><select id="target-type" aria-label="Target group"><option value="all" ${!S.free?'selected':''}>Need-based inquiries</option><option value="free" ${S.free?'selected':''}>Free agents only</option><option value="premium">Premium trade targets</option><option value="universe">Full outside scouting universe</option><option value="sell">Our selective sale candidates</option><option value="block">Trade-block status</option><option value="edges">Edgehunter research board</option></select><select id="target-pos" aria-label="Position"><option value="">All positions</option>${options(['P','C','1B','2B','3B','SS','LF','CF','RF','DH'],S.position)}</select></div><div class="twocol"><div id="target-list">${rows(r.players,40)}</div><aside>${panel('Current role options',r.internal.map(x=>`<div class="feeditem">${link(x)}<small>${esc(x.comparison_role||x.position)} · ${fmt(x.grade,1)}/10 · ${salary(x)}</small></div>`).join('')||empty('No internal match.'))}${panel('Modern Moneyball',`<p>${esc(r.edge)}</p><small>A useful skill becomes an edge when its price is lower than its role value. Exports do not include demands or trade acceptance.</small>`)}${panel('Trading block',`<p>${esc(r.trade_block)}</p>`)}</aside></div>`;}
-async function finances(){const f=await api('/api/office/finances');return head('What can we spend?','The exported funds, commitments and decisions shaping the next window.','FINANCE & CONTRACTS')+`<div class="lead"><span class="eyebrow">EXPORTED CASH TRADES AVAILABLE · VERIFY AGAINST THE GAME SCREEN</span><h1>${cash(f.reported_funds)}</h1><p>Confirm that this matches OOTP’s money for the transaction you intend.</p></div><div class="metrics">${metric('Game payroll',cash(f.financials.player_payroll))}${metric('Owner budget',cash(f.financials.budget))}${metric('Budget less payroll',cash(f.budget_less_payroll),'Context; not spendable cash')}${metric('Schedule gap',cash(f.reconciliation_difference),'Game payroll minus contracts')}</div><div class="twocol"><div>${panel('The next seven seasons',payrollChart(f.schedule)+table(['Season','Plan','Non-option schedule','Conditional options','Total'],f.schedule.map(x=>`<tr><td>${x.year}</td><td>${esc(x.mode)}</td><td>${cash(x.non_option)}</td><td>${cash(x.conditional)}</td><td>${cash(x.scheduled)}</td></tr>`)),badge('Light green = options'))}${panel('Paid contracts with no future scheduled year',rows(f.expiring,12))}</div><aside>${panel('Arbitration review · '+f.arbitration_review_year,f.arbitration_review.map(p=>`<div class="feeditem">${link(p)}<small>${p.service_years} service years · ${salary(p)}</small></div>`).join('')||empty('No ordinary arbitration candidates under these rules.'))}${panel('Before treating this as payroll room',`<p>${esc(f.note)}</p>${note('The '+cash(f.reconciliation_difference)+' gap remains visible. Bonuses, renewals and retention need game confirmation.',true)}<button data-nav="lab">Evaluate a contract →</button>`)}</aside></div>`;}
-async function development(){const r=await api('/api/office/development');S.pipelineData=r;return head('Keep the next contender coming.','Talent first. Organizational needs break ties within a potential tier.','DEVELOPMENT & DRAFT')+tabs(['Our pipeline','Draft board'],S.draft?'Draft board':'Our pipeline','data-pipeline')+`<div class="twocol"><div>${note(S.draft?r.note:'Ranked by exported potential. Open reports for current readiness, minor-league history and promotion costs.')}${rows(S.draft?r.draft:r.prospects,40)}</div><aside>${panel('Minor-league position depth',table(['Position','Players'],Object.entries(r.depth).sort((a,b)=>a[1]-b[1]).map(([p,n])=>`<tr><td>${p}</td><td>${n}</td></tr>`)))}${panel('Development changes',r.changes.slice(0,15).map(x=>`<div class="feeditem">${link(x)}<small>Current value ${fmt(x.current_change)} · potential ${fmt(x.potential_change)}</small></div>`).join('')||empty('No recorded change.'))}${panel('Draft discipline','<p>A stronger multi-tool outfielder can retain more value than a weaker infielder even when our infield is thin.</p><small>Potential, signing demands, availability and outcomes need review.</small>')}</aside></div>`;}
-async function lab(){const ps=(await api('/api/office/players',{scope:'organization',limit:500})).players;S.labPlayers=ps;return head('A decision, with the whole picture.','Compare doing nothing with a promotion, acquisition, contract or selective sale.','DECISION LAB')+`<div class="twocol"><div>${panel('Open a case',`<form id="case-form"><div class="formgrid"><label>Decision type<select name="type" id="case-type">${options(['Replacement','Promotion','Signing','Trade','Extension','Deadline plan'],'Replacement')}</select></label><label>Player<select name="player_id" id="case-player"><option value="">Select a player / need</option>${ps.map(p=>`<option value="${p.id}">${esc(p.name)} · ${p.position}</option>`).join('')}</select></label><label>Position need<select name="position">${options(['P','C','1B','2B','3B','SS','LF','CF','RF','DH'],'P')}</select></label><label class="wide">Your question<input name="question" placeholder="Who replaces our injured starter without weakening next year?"></label><label>Scenario direction<select name="scenario_mode">${options(S.office.modes,S.office.state.blueprint.seasons[S.status.snapshot.season])}</select></label><label>Assumed annual offer ($)<input name="annual_offer" type="number" min="0" max="100000000" value="0"></label><label>Offer length (years)<input name="offer_years" type="number" min="1" max="15" value="1"></label><label>Extension start year<input name="start_year" type="number" value="${S.status.snapshot.season+1}"></label><label>Assumed added service days<input name="added_service_days" type="number" min="0" max="172" value="0"></label><label>Player ID override (outside target)<input name="custom_player" type="number"></label><label>Outgoing player IDs<input name="send" placeholder="Comma-separated IDs"></label><label>Incoming player IDs<input name="receive" placeholder="Comma-separated IDs"></label><label class="wide"><input type="checkbox" name="override"> Evaluate an unlocked trade scenario only; keep standing protections saved</label></div><div class="actions"><button class="primary">Compare the alternatives</button><button type="button" id="save-case" disabled>Save this case</button></div></form>`)}<div id="case-report">${empty('Choose a question. The department brings evidence, alternatives and ramifications.')}</div></div><aside>${panel('Standing constraints',lockList())}${panel('The GM’s questions','<div class="feeditem"><strong>Injured starter?</strong>Internal depth or a temporary free agent.</div><div class="feeditem"><strong>Promote or wait?</strong>Readiness, service time, roster cost and playing time.</div><div class="feeditem"><strong>Extend or trade?</strong>Contract, alternatives and the next two seasons.</div><div class="feeditem"><strong>Sell without tearing down?</strong>Expiring pieces first; protect next year’s core.</div>')}${panel('Saved cases',S.office.state.decisions.slice(0,10).map(x=>`<div class="feeditem"><button data-case="${x.id}">${esc(x.report.question)}</button><small>${date(x.game_date)} · ${esc(x.status)}</small><select data-case-status="${x.id}" aria-label="Case status">${options(['Exploring','Chosen','Applied in OOTP','Revisit'],x.status)}</select></div>`).join('')||empty('No cases saved yet.'))}</aside></div>`;}
-function caseReport(r){return ownerContextPanel(r.owner_goals)+panel('The department’s recommendation',`<h2>${esc(r.recommendation)}</h2><p>${esc(r.why)}</p>${badge(r.locks_respected?'Standing locks respected':'Unlocked scenario only',r.locks_respected?'green':'gold')} ${badge(r.scenario_mode)}<p><small>Captured ${date(r.game_date)} · offers, service days and scenario direction are assumptions.</small></p>`)+panel('Alternatives',r.alternatives.map(x=>`<div class="attention"><h3>${x.player_id?link({id:x.player_id,name:x.name}):esc(x.name)}</h3><p>${esc(x.summary)}</p></div>`).join(''))+(r.internal?panel('Internal options',rows(r.internal,3)):'')+(r.external?panel('Temporary outside help',rows(r.external,3)):'')+(r.candidates?panel('Selective sale review',rows(r.candidates,10)):'')+(r.incoming?panel('Incoming fit',rows(r.incoming))+panel('Outgoing cost',rows(r.outgoing)):'')+(r.package?panel('Scheduled payroll change',table(['Season','Change'],r.package.years.map(x=>`<tr><td>${x.year}</td><td>${money(x.payroll_change)}</td></tr>`))+r.package.flags.map(x=>note(x,true)).join('')):'')+(r.player?panel('Player & contract',r.player.player?rows([r.player.player])+contractTable(r.player.contract_schedule):rows([r.player])):'')+(r.service_scenario?panel('Illustrative service-time scenario',`<div class="metrics">${metric('Current total days',r.service_scenario.current_days)}${metric('Assumed new days',r.service_scenario.assumed_added_days)}${metric('Illustrative total',r.service_scenario.projected_total)}</div>${note(r.service_scenario.note,true)}${r.promotion.notes.map(x=>`<p>${esc(x)}</p>`).join('')}`):'')+(r.financial_context?panel('Cost & spending context',`<div class="metrics">${metric('Exported funds',cash(r.financial_context.reported_cash_trades_available))}${metric('Manual offer total',cash(r.financial_context.manual_offer_total))}</div>${note(r.financial_context.note)}`):'')+panel('Before making the move',`<ul>${r.checks.map(x=>`<li>${esc(x)}</li>`).join('')}</ul><small>Mark “Applied in OOTP” after making the change yourself. Saving does not move players.</small>`);}
-async function league(){const r=await api('/api/office/league',{year:S.leagueYear||''});S.league=r;r.batting.sort((a,b)=>(b[S.batMetric||'ops']||0)-(a[S.batMetric||'ops']||0));r.pitching=(S.pitchGroup==='Relievers'?r.relievers:r.pitching);r.pitching.sort((a,b)=>['era','fip','whip'].includes(S.pitMetric||'fip')?(a[S.pitMetric||'fip']??99)-(b[S.pitMetric||'fip']??99):(b[S.pitMetric]||0)-(a[S.pitMetric]||0));r.batting=r.batting.slice(0,20);r.pitching=r.pitching.slice(0,20);return head('Know the league you’re building for.','League leaders, rating distributions and the standards behind our language.','LEAGUE INTELLIGENCE')+tabs(['Leaders','Rating benchmarks','Stat standards','Checkpoints','Standings'],S.leagueTab,'data-league')+`<div class="filters"><label>Stats season<select id="league-year">${options(r.years.map(String),String(r.year))}</select></label><label>Hitter ranking<select id="bat-metric">${options(['ops','obp','avg','hr','war'],S.batMetric||'ops')}</select></label><label>Pitching group<select id="pitch-group">${options(['Starters / full workload','Relievers'],S.pitchGroup||'Starters / full workload')}</select></label><label>Pitcher ranking<select id="pit-metric">${options(['fip','era','whip','k_bb_pct','war','s'],S.pitMetric||'fip')}</select></label></div>`+(S.leagueTab==='Leaders'?`<div class="metrics">${metric(r.year+' league OPS',rate(r.baseline_bat.ops))}${metric('League OBP',rate(r.baseline_bat.obp))}${metric('League ERA',fmt(r.baseline_pit.era,2))}${metric('League K−BB%',pct(r.baseline_pit.k_bb_pct))}</div>${note(r.note)}<div class="columns">${panel(r.year+' hitters · '+(S.batMetric||'ops').toUpperCase()+' leaders',table(['Player','PA','AVG','OBP','OPS','HR','WAR'],r.batting.map(p=>`<tr><td>${link(p)}</td><td>${p.pa}</td><td>${rate(p.avg)}</td><td>${rate(p.obp)}</td><td>${rate(p.ops)}</td><td>${p.hr}</td><td>${fmt(p.war,1)}</td></tr>`)),badge('Minimum '+r.pa_min+' PA'))}${panel(r.year+' pitchers · '+(S.pitMetric||'fip').toUpperCase()+' leaders',table(['Player','IP','ERA','FIP','K−BB%','WAR'],r.pitching.map(p=>`<tr><td>${link(p)}</td><td>${p.ip_display}</td><td>${fmt(p.era,2)}</td><td>${fmt(p.fip,2)}</td><td>${pct(p.k_bb_pct)}</td><td>${fmt(p.war,1)}</td></tr>`)),badge('Minimum '+(S.pitchGroup==='Relievers'?'30':fmt(r.outs_min/3))+' IP'))}</div>`:S.leagueTab==='Standings'?panel('Current exported standings',table(['Club','W','L','PCT','GB'],r.standings.map(x=>`<tr><td>${esc(x.name)}</td><td>${x.w}</td><td>${x.l}</td><td>${fmt(x.pct,3)}</td><td>${fmt(x.gb,1)}</td></tr>`))):S.leagueTab==='Rating benchmarks'?benchmarkView(r):S.leagueTab==='Stat standards'?panel('Standards from this league',note('Empirical cutoffs among qualified players. Lower ERA/FIP is better. Ratings and performance are different benchmarks.')+table(['Stat','Sample','10th','25th','Median','75th','90th','95th'],Object.entries(r.bands).map(([key,v])=>`<tr><td>${key.toUpperCase()} ${v.lower_better?'↓':''}</td><td>${v.n}</td>${[10,25,50,75,90,95].map(q=>`<td>${key.includes('pct')?pct(v.cutoffs[q]):['era','fip'].includes(key)?fmt(v.cutoffs[q],2):rate(v.cutoffs[q])}</td>`).join('')}</tr>`)))+panel('Performance language',table(['Relative result','Meaning'],[['Bottom 10%','Poor within qualified sample'],['10–25%','Below average'],['25–75%','Around the middle'],['75–90%','Good / above average'],['90–95%','Excellent'],['Top 5%','Elite in this stat; superstar status requires broader value']].map(x=>`<tr><td>${x[0]}</td><td class="wrap">${x[1]}</td></tr>`))):panel('Three rating checkpoints',`<p>Capture an actual export at the start, All-Star break and end. Dates that were never exported cannot have a rating history.</p><div class="actions">${['Opening season','All-Star break','End of season'].map(x=>`<button data-checkpoint="${x}">Label current export: ${x}</button>`).join('')}</div>${r.checkpoints.map(x=>`<div class="feeditem"><strong>${esc(x.label)} · ${x.year}</strong><small>${date(x.game_date)} · ${esc(x.snapshot)}</small></div>`).join('')||empty('No checkpoints yet.')}`));}
-function benchmarkView(r){const a=r.distributions.filter(x=>x.role===S.role);if(!a.some(x=>x.label===S.stat))S.stat=a[0]?.label;const d=a.find(x=>x.label===S.stat);if(!d)return empty('No rating cohort.');const mx=Math.max(...d.scale.map(x=>x.count),1);return `<div class="filters"><select id="benchmark-role" aria-label="Cohort">${options(['Hitters','Starters','Relievers'],S.role)}</select><select id="benchmark-stat" aria-label="Skill">${options(a.map(x=>x.label),S.stat)}</select></div><div class="twocol"><div>${panel(S.role+' · '+d.label,`<div class="metrics">${metric('League mean',fmt(d.mean,2)+'/10',d.n+' assigned MLB players')}${metric('A 5’s percentile',fmt(d.scale[4].percentile,1)+'%',d.scale[4].tied+'% tied')}</div><div class="distribution">${d.scale.map(x=>`<div><svg viewBox="0 0 40 75" preserveAspectRatio="none"><rect x="4" y="${75-65*x.count/mx}" width="32" height="${65*x.count/mx}" fill="#35784d"><title>${x.count} players rated ${x.rating}</title></rect></svg>${x.rating}</div>`).join('')}</div>${table(['Rating','Players','Below','Tied','Above','Midpoint percentile'],d.scale.map(x=>`<tr><td>${x.rating}/10</td><td>${x.count}</td><td>${x.lower}%</td><td>${x.tied}%</td><td>${x.higher}%</td><td>${x.percentile}%</td></tr>`))}`)}</div><aside>${panel('Why 5 is not automatically average',`<p>A rating describes the displayed skill. The distribution tells you where it stands in this save.</p><p>${d.scale[4].lower}% are below a 5; ${d.scale[4].tied}% are tied. We allocate half the ties below for the midpoint percentile.</p><small>Pitching cohorts use stamina and recent MLB usage; role inference is a heuristic.</small>`)}</aside></div>`;}
-async function notebook(){const j=await api('/api/journal');return head('Keep the reasons, not just the moves.','Watchlists, cases and notes preserve what you knew at the time.','GM NOTEBOOK')+`<div class="twocol"><div>${panel('Write a note',`<form id="journal-form"><label>Your reasoning<textarea name="text" required></textarea></label><button class="primary">Save note</button></form>`)}${panel('Decision timeline',S.office.state.decisions.map(x=>`<div class="feeditem"><strong>${esc(x.report.question)}</strong>${badge(x.status)}<small>${date(x.game_date)}</small><p>${esc(x.report.recommendation)}</p><button data-note-case="${x.id}">Open full case</button></div>`).join('')||empty('Saved cases appear here.'))}${panel('Notes',j.map(x=>`<div class="feeditem"><small>${date(x.game_date)}</small><p>${esc(x.text)}</p></div>`).join('')||empty('No notes yet.'))}</div><aside>${panel('Watchlist',S.office.state.watchlist.map(x=>`<div class="feeditem">${link({id:x.player_id,name:x.name})}<p>${esc(x.reason)}</p><small>Review: ${esc(x.review)}</small><button data-unwatch="${x.id}">Remove from watchlist</button></div>`).join('')||empty('Watch a player from scouting.'))}${panel('Locks',lockList())}</aside></div>`;}
-async function guide(){const q=await api('/api/quality');return head('Understand the department.','Definitions, transparent methods and the limits of the files.','FIELD GUIDE')+tabs(['Definitions','Data & methods','Jev connection'],S.guideTab||'Definitions','data-guide')+((S.guideTab||'Definitions')==='Definitions'?`<div class="filters"><input id="guide-search" type="search" placeholder="Find OPS, service time, percentiles…" aria-label="Search definitions"></div><section class="panel" id="definitions">${S.office.glossary.map(x=>`<article class="guideitem" data-term="${esc((x.term+' '+x.definition).toLowerCase())}"><h3>${esc(x.term)}</h3><p>${esc(x.definition)}</p></article>`).join('')}</section>`:S.guideTab==='Jev connection'?panel('A second analytical reader',`<p>Jev is ${S.status.jev.configured?'connected and ready':'not connected'}. Reports offer a structured role/evidence review. The department still writes the summary and performs calculations.</p><small>Cached judgments are not probabilities of baseball success.</small><details><summary>Update connection</summary><form id="jev-form"><label>API key<input type="password" name="key" autocomplete="off" required></label><label><input type="checkbox" name="remember" checked> Remember securely on this PC</label><button>Save key</button></form></details>`):`${panel('Fact, calculation, inference or missing?',table(['Layer','Meaning'],[['Exported fact','Ratings, contracts, roster flags, recorded counts and park factors.'],['Calculation','OPS/FIP, schedules, tie-aware percentiles and weighted park factors.'],['Inference','Role, grade, suggestions and provisional recommendations.'],['Unverified','Trade-block codes, asking prices, acceptance and exact move legality.']].map(x=>`<tr><td>${x[0]}</td><td class="wrap">${x[1]}</td></tr>`)))}${panel('Forecasts & validation',q.limitations.map(x=>`<p>${esc(x)}</p>`).join('')+`<details><summary>Backtest evidence</summary><pre>${esc(JSON.stringify(q.backtests,null,2))}</pre></details>`)}${panel('Imports',`<p>Update Files checks for completed, stable CSVs. Export from OOTP first. Failed imports preserve the last valid snapshot.</p><a href="/api/export" download="organization.csv">Download organization CSV</a><details><summary>Source & audit</summary><pre>${esc(JSON.stringify({source:S.status.source,manifest:q.manifest},null,2))}</pre></details>`)}`);}
-function contractTable(rs){return rs.length?table(['Year','Salary','Terms','Buyout','Source'],rs.map(x=>`<tr><td>${x.year}</td><td>${money(x.salary)}</td><td>${esc(x.type)}</td><td>${money(x.buyout)}</td><td>${esc(x.source)}</td></tr>`)):empty('No future scheduled contract years exported.');}
-async function openPlayer(id){const dlg=$('#player-dialog');if(!dlg.open)dlg.showModal();$('#player-content').innerHTML='<div class="loading">Opening the full report…</div>';try{S.report=await api('/api/office/player',{id});S.tab='Overview';renderPlayer();}catch(e){$('#player-content').innerHTML=`<div class="error">${esc(e.message)}</div>`;}}
-function renderPlayer(){const r=S.report,p=r.player;$('#player-content').innerHTML=`<header class="playerhero"><span class="avatar">${esc(p.name.split(' ').map(x=>x[0]).slice(0,2).join(''))}</span><div><span class="eyebrow">${esc(p.team)} · ${p.position} · AGE ${p.age} · ${esc(p.bats)}/${esc(p.throws)}</span><h1>${esc(p.name)}</h1>${badge(p.injured||p.on_dl?'Injury review':p.active?'Active roster':'Internal / outside option',p.injured?'red':'green')} ${p.locks.length?badge('GM locked','gold'):''}<small> Player ID ${p.id}</small></div><div class="contractmini"><div class="big">${salary(p)}</div><small>${p.end_year?'Through '+p.end_year+' · '+p.years_left+' seasons including current':'Contract needs review'}</small><small>${cash(p.scheduled_total)} remaining scheduled</small></div></header><div class="reporttabs">${tabs(['Overview','Skills','Performance','Team fit','Contract','Decision history'],S.tab,'data-report-tab')}</div><section class="reportbody">${playerBody(r)}</section>`;}
-function playerBody(r){const p=r.player,f=r.projection,bat=p.kind==='bat';if(S.tab==='Overview')return `<article class="lead"><h2>${esc(p.summary)}</h2><p>${esc(p.detail)}</p></article><div class="metrics">${metric('Department fit',fmt(p.grade,1)+'/10','Preference grade, not predicted wins')}${metric(bat?'Forecast OPS':'Forecast FIP',bat?rate(f.ops):fmt(f.fip,2),'Conservative MLB forecast')}${metric('MLB evidence',fmt(f.observed_exposure),bat?'Prior-season PA':'Prior-season batters faced')}</div><div class="columns">${panel('Why we see it this way',r.why.filter(x=>!x.includes('engine current value')).map(x=>`<p>${esc(x)}</p>`).join('')+`<p>${esc(p.fit.notes[0])}</p>${r.interval?note('Historical error band: '+fmt(r.interval.low,bat?3:2)+'–'+fmt(r.interval.high,bat?3:2)+' '+(bat?'OPS':'FIP')+'. Population range; not a personal guarantee.'):note('Limited history: no personalized range available.')}`)}${panel('Your next action',`<div class="actions"><button data-player-lock="${p.id}">Lock this player</button><button data-watch="${p.id}">Add to watchlist</button><button id="jev-review">Ask Jev for a second read</button><button id="print-report">Print</button></div><div id="jev-result"></div><p><small>Review injury, roster and contract implications before changing assignments.</small></p>`)}</div>`;
-if(S.tab==='Skills')return `<div class="columns">${panel('Current skills & future potential',r.skills.map(x=>`<div class="skillbox"><div class="skilltitle"><span>${esc(x.label)}</span><strong>${fmt(x.current)}/10</strong></div><div class="skilltrack"><svg viewBox="0 0 100 9" preserveAspectRatio="none"><rect x="0" y="0" width="${Math.min(100,x.current*10)}" height="9" fill="#35784d"/></svg></div><small>Potential ${fmt(x.potential)}/10 · ${fmt(x.percentile,1)}th midpoint percentile of ${x.n} MLB ${x.cohort.toLowerCase()}</small><small>Mean ${fmt(x.mean,2)} · ${x.lower}% below / ${x.tied}% tied / ${x.higher}% above</small><small>vs R ${fmt(x.vsr)} · vs L ${fmt(x.vsl)}</small></div>`).join(''))}${panel('Defense, running & repertoire',ratingsTable(r))}</div>${panel('Rating history',r.rating_history.length>1?table(['Export date',...r.skills.map(x=>x.label)],r.rating_history.map(x=>`<tr><td>${date(x.game_date)}</td>${r.skills.map(k=>`<td>${fmt(x.ratings[k.label])}</td>`).join('')}</tr>`)):empty('The first capture establishes the baseline. Future exports build this history.'))}${note('Contact is composite. BABIP and avoid-K are shown for diagnosis, without adding them again to contact in the grade.')}`;
-if(S.tab==='Performance'){const hs=r.histories[bat?'bat':'pit'];return panel('Recorded season history',table(bat?['Year','League','PA','AVG','OBP','SLG','OPS','HR','BB%','K%','WAR']:['Year','League','IP','ERA','FIP','K%','BB%','WAR'],hs.slice(0,18).map(x=>`<tr><td>${x.year}</td><td>${esc(x.league)}</td>${bat?`<td>${x.pa}</td><td>${rate(x.avg)}</td><td>${rate(x.obp)}</td><td>${rate(x.slg)}</td><td>${rate(x.ops)}</td><td>${x.hr}</td><td>${pct(x.bb_pct)}</td><td>${pct(x.k_pct)}</td>`:`<td>${x.ip_display}</td><td>${fmt(x.era,2)}</td><td>${fmt(x.fip,2)}</td><td>${pct(x.k_pct)}</td><td>${pct(x.bb_pct)}</td>`}<td>${fmt(x.war,1)}</td></tr>`)))+panel('When results do not match talent',`<p>Check playing time, level, handedness, injuries, BB%, K% and BABIP against the player’s history and the league. A high rating is evidence of talent, not a guaranteed average.</p>${note('Minor-league stats stay at their actual level. Historical handedness split codes are unverified; platoon suggestions use explicitly named vs-L/vs-R ratings.',true)}<details><summary>Split records & fielding evidence</summary><pre>${esc(JSON.stringify({splits:r.splits,fielding:r.fielding},null,2))}</pre></details>`);}
-if(S.tab==='Team fit')return `<div class="columns">${panel('Our park & league',`<h2>${esc(p.fit.home)}</h2>${p.fit.notes.map(x=>`<p>${esc(x)}</p>`).join('')}${table(['Factor','Home','Schedule weighted'],[['Average','avg'],['Doubles','d'],['Triples','t'],['HR, left-handed','hr_l'],['HR, right-handed','hr_r']].map(([l,k])=>`<tr><td>${l}</td><td>${fmt(r.schedule.home[k],3)}</td><td>${fmt(r.schedule.factors[k],3)}</td></tr>`))}${note(p.fit.label)}`)}${panel('Venue exposure',table(['Exposure','Games','Share'],Object.entries(r.schedule.groups).map(([k,n])=>`<tr><td>${esc(k)}</td><td>${n}</td><td>${r.schedule.games?pct(n/r.schedule.games):'Unavailable'}</td></tr>`))+`<details><summary>All venues</summary>${table(['Ballpark','Games','Share'],r.schedule.venues.map(x=>`<tr><td>${esc(x.name)}</td><td>${x.games}</td><td>${pct(x.weight)}</td></tr>`))}</details>`)}</div>${panel('How the grade is built',`<p>65% current rating preference score (${fmt(p.rating_component,2)}) + 35% conservative MLB rate score (${fmt(p.stat_component,2)}) + park adjustment (${fmt(p.fit.adjustment,3)}), bounded from 1 to 10.</p><p>Current weights: ${Object.entries(p.grade_weights).map(([k,v])=>esc(k)+' '+pct(v/Object.values(p.grade_weights).reduce((a,b)=>a+b,0))).join(' · ')}.</p><small>Grade changes do not alter the statistical forecast. This formula has not been calibrated to future wins.</small>`)}`;
-if(S.tab==='Contract')return panel('Full salary schedule',contractTable(r.contract_schedule))+`<div class="columns">${panel('Control & promotion ramifications',`<div class="statstrip"><div><small>Service years</small><b>${fmt(r.promotion.service_years)}</b></div><div><small>Total service days</small><b>${fmt(r.promotion.service_days)}</b></div><div><small>Roster options used</small><b>${fmt(r.promotion.options_used)}</b></div></div><p>Arbitration minimum: ${fmt(r.promotion.arb_min)} service years. Free agency minimum: ${fmt(r.promotion.fa_min)}. Signed coverage takes precedence over arbitration review.</p>${r.promotion.notes.map(x=>`<p>${esc(x)}</p>`).join('')}`)}${panel('Terms & incentives',table(['Term','Exported value'],['no_trade','opt_out','retained','minimum_pa','minimum_pa_bonus','minimum_ip','minimum_ip_bonus','mvp_bonus','cyyoung_bonus','allstar_bonus'].map(k=>`<tr><td>${esc(k.replaceAll('_',' '))}</td><td>${esc(r.contract[k]??'Not exported')}</td></tr>`))+`<details><summary>All contract & roster fields</summary><pre>${esc(JSON.stringify({contract:r.contract,extension:r.extension,roster:r.roster},null,2))}</pre></details>`+note('Options are conditional. Opt-out and retention codes require game-screen confirmation; scheduled totals are not labeled guaranteed.'))}</div>`;
-return panel('Decisions',r.decisions.map(x=>`<div class="feeditem"><strong>${esc(x.report.question)}</strong>${badge(x.status)}<p>${esc(x.report.recommendation)}</p></div>`).join('')||empty('No saved decisions involving this player.'))+panel('Player notes',`<form id="player-note-form"><label>Your note<textarea name="text" required></textarea></label><button>Save player note</button></form>`+r.notes.map(x=>`<div class="feeditem"><small>${date(x.game_date)}</small><p>${esc(x.text)}</p></div>`).join(''));}
-function ratingsTable(r){const rs={};for(const [k,v] of Object.entries(r.ratings.players_fielding||{}))if(/rating_pos|range|arm|error|turn|framing|ability/.test(k)&&!k.includes('experience'))rs[k]=v;const extra=r.player.kind==='bat'?r.ratings.players_batting:r.ratings.players_pitching;for(const [k,v] of Object.entries(extra||{}))if((k.startsWith('running_')||k.startsWith('pitching_ratings_pitches_')||k==='pitching_ratings_misc_stamina')&&!k.includes('talent')&&v)rs[k]=v;return table(['Exported skill','Current'],Object.entries(rs).map(([k,v])=>`<tr><td class="wrap">${esc(k.replace('pitching_ratings_pitches_','Pitch: ').replace('fielding_','').replace('running_ratings_','Running: ').replaceAll('_',' '))}</td><td>${fmt(v)}</td></tr>`))+note('Named ratings are shown as exported. Raw experience/propensity codes are not displayed as 1–10 skills.');}
-async function saveAction(b){if(S.snapshot)throw Error('Switch to the latest export before saving.');await api('/api/office/save',{},b);S.office=await api('/api/office');}
-async function lockForm(pid){const ps=(await api('/api/office/players',{scope:'organization',limit:500})).players,dlg=$('#player-dialog');if(!dlg.open)dlg.showModal();$('#player-content').innerHTML=`<div class="reportbody"><h1>Lock a player in place.</h1><p>Suggestions respect this until you approve removing it.</p><form id="lock-form"><div class="formgrid"><label>Player<select name="player_id">${ps.map(p=>`<option value="${p.id}" ${p.id===pid?'selected':''}>${esc(p.name)}</option>`).join('')}</select></label><label>Type<select name="scope">${options(['roster','lineup','rotation','bullpen','trade'],'lineup')}</select></label><label>Handedness<select name="hand">${options(['both','vsr','vsl'],'both')}</select></label><label>Position<select name="position"><option value="">Player’s position</option>${options(['C','1B','2B','3B','SS','LF','CF','RF','DH'],'')}</select></label><label>Batting / rotation slot<input name="slot" type="number" min="0" max="9" value="0"></label><label class="wide">Your reason<textarea name="reason"></textarea></label></div><button class="primary">Save binding lock</button></form></div>`;$('#lock-form').onsubmit=async e=>{e.preventDefault();try{await saveAction({action:'lock',...Object.fromEntries(new FormData(e.target))});dlg.close();toast('Lock saved.');render();}catch(x){toast(x.message);}};}
-async function watchForm(pid){const p=(await api('/api/office/player',{id:pid})).player,dlg=$('#player-dialog');if(!dlg.open)dlg.showModal();$('#player-content').innerHTML=`<div class="reportbody"><h1>Watch ${esc(p.name)}.</h1><form id="watch-form"><label>What are we watching?<textarea name="reason"></textarea></label><label>Review point<input name="review" value="Next export"></label><button class="primary">Save to watchlist</button></form></div>`;$('#watch-form').onsubmit=async e=>{e.preventDefault();try{await saveAction({action:'watch',player_id:pid,...Object.fromEntries(new FormData(e.target))});dlg.close();toast('Watchlist saved.');render();}catch(x){toast(x.message);}};}
-function bindPage(){if($('#blueprint-form')){$$('input[name=identity]').forEach(el=>el.onchange=()=>{el.closest('.identity').querySelector('details').open=el.checked;const primary=$('[name=primary]');if(!primary.value&&el.checked)primary.value=el.value;else if(primary.value===el.value&&!el.checked)primary.value=$('input[name=identity]:checked')?.value||'';});}if($('#blueprint-form'))$('#blueprint-form').onsubmit=async e=>{e.preventDefault();const f=new FormData(e.target),ids=f.getAll('identity'),primary=f.get('primary');if(primary&&!ids.includes(primary)){toast('Select the primary identity checkbox first.');return;}const b={...S.office.state.blueprint,seasons:{...S.office.state.blueprint.seasons},skills:{}};for(const y of [S.status.snapshot.season,S.status.snapshot.season+1,S.status.snapshot.season+2])b.seasons[y]=f.get('season-'+y);for(const k of ['goal','philosophy','cadence','boundaries','reason','playing_notes'])b[k]=f.get(k);b.identities=primary?[primary,...ids.filter(x=>x!==primary)]:ids;b.style_source=b.identities;b.style_overrides=JSON.parse(e.target.dataset.styleOverrides||'[]');b.skills=Object.fromEntries(S.office.skills.map(x=>[x,f.get('skill-'+x)]));try{await saveAction({action:'blueprint',blueprint:b});toast('Blueprint saved with game date and reason.');render();}catch(x){toast(x.message);}};
-for(const id of ['scope','kind','sort'])if($('#'+id))$('#'+id).onchange=e=>{F[id]=e.target.value;S.offset=0;render();};if($('#player-search'))$('#player-search').onchange=e=>{F.q=e.target.value;S.offset=0;render();};if($('#direction'))$('#direction').onclick=()=>{F.direction=F.direction==='desc'?'asc':'desc';render();};if($('#prev'))$('#prev').onclick=()=>{S.offset=Math.max(0,S.offset-12);render();};if($('#next'))$('#next').onclick=()=>{S.offset+=12;render();};if($('#internal'))$('#internal').onchange=e=>{S.internal=e.target.checked;render();};if($('#target-pos'))$('#target-pos').onchange=e=>{S.position=e.target.value;render();};if($('#target-type'))$('#target-type').onchange=e=>{if(e.target.value==='sell')$('#target-list').innerHTML=note('Expiring pieces first. Preserve next year’s core and trade-protected players.')+rows(S.targets.selling,40);else if(e.target.value==='block')$('#target-list').innerHTML=note(S.targets.trade_block,true);else if(e.target.value==='edges')$('#target-list').innerHTML=note('Research signals among healthy external players with known scheduled salaries up to $8m. This is a filter, not proof of a market bargain.')+S.targets.edges.map(x=>panel(x.player.name,`<p>${badge(x.status,'gold')} ${salary(x.player)}</p><ul>${x.signals.map(v=>`<li>${esc(v)}</li>`).join('')}</ul>${link(x.player)}`)).join('');else{S.free=e.target.value==='free';render();}};
-if($('#benchmark-role'))$('#benchmark-role').onchange=e=>{S.role=e.target.value;render();};if($('#benchmark-stat'))$('#benchmark-stat').onchange=e=>{S.stat=e.target.value;render();};if($('#guide-search'))$('#guide-search').oninput=e=>$$('#definitions [data-term]').forEach(x=>x.hidden=!x.dataset.term.includes(e.target.value.toLowerCase()));
-if($('#journal-form'))$('#journal-form').onsubmit=async e=>{e.preventDefault();try{await api('/api/journal',{},Object.fromEntries(new FormData(e.target)));toast('Note saved.');render();}catch(x){toast(x.message);}};if($('#jev-form'))$('#jev-form').onsubmit=async e=>{e.preventDefault();const f=new FormData(e.target);try{await api('/api/jev/setup',{}, {key:f.get('key'),remember:f.has('remember')});e.target.reset();await status();toast('Jev connection saved securely.');render();}catch(x){toast(x.message);}};
-if($('#case-type'))$('#case-type').onchange=async e=>{const r=await api('/api/office/players',{scope:['Signing','Trade'].includes(e.target.value)?'all':'organization',limit:500});$('#case-player').innerHTML='<option value="">Select a player / need</option>'+r.players.map(p=>`<option value="${p.id}">${esc(p.name)} · ${p.team}</option>`).join('');};
-if($('#case-form'))$('#case-form').onsubmit=async e=>{e.preventDefault();const f=new FormData(e.target),c=Object.fromEntries(f);c.player_id=Number(c.custom_player||c.player_id);c.override=f.has('override');for(const k of ['send','receive'])c[k]=c[k].split(',').map(x=>x.trim()).filter(Boolean).map(Number);try{const r=await api('/api/office/evaluate',{},c);S.currentCase=c;$('#case-report').innerHTML=caseReport(r);$('#save-case').disabled=false;}catch(x){toast(x.message);}};
-if($('#save-case'))$('#save-case').onclick=async()=>{try{await saveAction({action:'decision',case:S.currentCase});toast('Case saved with this export and blueprint.');render();}catch(x){toast(x.message);}};$$('[data-case-status]').forEach(el=>el.onchange=async e=>{try{await saveAction({action:'decision-status',id:el.dataset.caseStatus,status:e.target.value});toast('Status updated.');}catch(x){toast(x.message);}});}
-document.addEventListener('click',async e=>{const t=e.target.closest('button,a');if(!t)return;try{if(t.dataset.player){e.preventDefault();await openPlayer(Number(t.dataset.player));}if(t.dataset.nav)location.hash=t.dataset.nav;if(t.hasAttribute('data-retry'))render();if(t.dataset.reportTab){S.tab=t.dataset.reportTab;renderPlayer();}if(t.dataset.hand){S.hand=t.dataset.hand==='vs right-handers'?'vsr':'vsl';render();}if(t.dataset.pipeline){S.draft=t.dataset.pipeline==='Draft board';S.pipelineOffset=0;render();}if(t.dataset.league){S.leagueTab=t.dataset.league;render();}if(t.dataset.guide){S.guideTab=t.dataset.guide;render();}if(t.dataset.playerLock)await lockForm(Number(t.dataset.playerLock));if(t.hasAttribute('data-lock-open'))await lockForm();if(t.dataset.watch)await watchForm(Number(t.dataset.watch));if(t.dataset.unlock){await saveAction({action:'unlock',id:t.dataset.unlock});toast('Lock removed by your approval.');render();}if(t.dataset.unwatch){await saveAction({action:'unwatch',id:t.dataset.unwatch});render();}if(t.dataset.checkpoint){await saveAction({action:'checkpoint',label:t.dataset.checkpoint});toast('Export labeled '+t.dataset.checkpoint);render();}if(t.dataset.case||t.dataset.noteCase){const c=S.office.state.decisions.find(x=>x.id===(t.dataset.case||t.dataset.noteCase));if($('#case-report'))$('#case-report').innerHTML=caseReport(c.report);else{const dlg=$('#player-dialog');if(!dlg.open)dlg.showModal();$('#player-content').innerHTML='<div class="reportbody">'+caseReport(c.report)+'</div>';}}if(t.id==='print-report')window.print();if(t.id==='jev-review'){t.disabled=true;t.textContent='Jev is reviewing…';try{const r=await api('/api/jev/review',{}, {id:S.report.player.id});$('#jev-result').innerHTML=note('Jev’s second read complements the evidence above; classification confidence is not baseball success probability.')+Object.entries(r.response.answers).map(([k,a])=>`<div class="feeditem"><strong>${esc(k.replaceAll('_',' '))}: ${esc(({regular:'Everyday role',specialist:'Matchup specialist',rotation:'Starting rotation',relief:'Bullpen role',review:'Needs further review',ratings:'Ratings carry more weight',history:'Recorded history carries more weight'})[a.choice]||a.choice)}</strong><small>${pct(a.confidence)} classification confidence${a.confidence<.8?' · provisional; needs review':''} · ${r.cached?'cached':'new'} review</small></div>`).join('')+`<details><summary>Review details</summary><pre>${esc(JSON.stringify(r,null,2))}</pre></details>`;}finally{t.disabled=false;t.textContent='Ask Jev for a second read';}}}catch(x){toast(x.message);}});
-document.addEventListener('submit',async e=>{if(e.target.id==='player-note-form'){e.preventDefault();try{await api('/api/journal',{}, {text:new FormData(e.target).get('text'),player_id:S.report.player.id});toast('Player note saved.');await openPlayer(S.report.player.id);S.tab='Decision history';renderPlayer();}catch(x){toast(x.message);}}});
-$('#close-player').onclick=()=>$('#player-dialog').close();$('#snapshot-select').onchange=async e=>{S.snapshot=e.target.value;$('#player-dialog').close();await status();render();};$('#refresh').onclick=async()=>{try{await api('/api/import',{},{});toast('Checking completed exports. Export from OOTP first if the game changed.');await status();}catch(e){toast(e.message);}};window.addEventListener('hashchange',render);document.addEventListener('DOMContentLoaded',()=>status().then(render).catch(e=>{$('#content').innerHTML='<div class="error">'+esc(e.message)+'</div>';}));setInterval(()=>status().catch(()=>{}),15000);
-function teaching(){for(const el of $$('th,.metric label,.skilltitle>span')){if(el.querySelector('.helpbutton'))continue;const text=el.textContent.trim(),term=S.office?.glossary.find(x=>x.term.toLowerCase()===text.toLowerCase())||S.office?.glossary.find(x=>text.toLowerCase().includes(x.term.toLowerCase())&&x.term.length>3);if(term){const b=document.createElement('button');b.className='helpbutton';b.textContent='?';b.type='button';b.setAttribute('aria-label','Explain '+term.term);b.title=term.definition;b.dataset.help=term.term;b.onfocus=()=>showHelp(term);b.onmouseenter=()=>showHelp(term);b.onmouseleave=()=>{if(document.activeElement!==b)$('#help-popover').hidden=true;};b.onblur=()=>$('#help-popover').hidden=true;el.append(' ',b);}}}
-function showHelp(term){let p=$('#help-popover');if(!p){p=document.createElement('aside');p.id='help-popover';p.setAttribute('role','status');document.body.append(p);}p.innerHTML='<strong>'+esc(term.term)+'</strong><p>'+esc(term.definition)+'</p>';p.hidden=false;}
-function packagePicker(side){const el=$(`input[name=${side}]`);if(!el)return;el.type='hidden';const wrap=document.createElement('div');wrap.className='packagepicker';wrap.innerHTML=`<input type="search" id="${side}-search" placeholder="Search ${side==='send'?'our players':'outside targets'} by name" aria-label="${side==='send'?'Outgoing':'Incoming'} player search"><div id="${side}-matches"></div><div id="${side}-chips"></div>`;el.parentElement.append(wrap);let generation=0;const selected=[];wrap.querySelector('input').oninput=async e=>{const gen=++generation,q=e.target.value;if(q.length<2){$(`#${side}-matches`).innerHTML='';return;}try{const r=await api('/api/office/players',{scope:side==='send'?'organization':'all',q,limit:15});if(gen!==generation)return;$(`#${side}-matches`).innerHTML=r.players.filter(p=>side==='send'||p.organization_id!==S.status.snapshot.team_id).map(p=>`<button type="button" data-package-player="${p.id}">${esc(p.name)} · ${esc(p.team)}</button>`).join('');$$(`#${side}-matches button`).forEach(b=>b.onclick=()=>{if(!selected.some(p=>p.id===Number(b.dataset.packagePlayer))){selected.push(r.players.find(p=>p.id===Number(b.dataset.packagePlayer)));draw();}e.target.value='';$(`#${side}-matches`).innerHTML='';});}catch(x){toast(x.message);}};function draw(){el.value=selected.map(p=>p.id).join(',');$(`#${side}-chips`).innerHTML=selected.map(p=>`<button type="button" data-package-remove="${p.id}">${esc(p.name)} ×</button>`).join('');$$(`#${side}-chips button`).forEach(b=>b.onclick=()=>{selected.splice(selected.findIndex(p=>p.id===Number(b.dataset.packageRemove)),1);draw();});}}
-const originalBind=bindPage;bindPage=function(){originalBind();for(const [id,key] of [['league-year','leagueYear'],['bat-metric','batMetric'],['pit-metric','pitMetric'],['pitch-group','pitchGroup']])if($('#'+id))$('#'+id).onchange=e=>{S[key]=e.target.value;render();};for(const side of ['send','receive'])packagePicker(side);if($('#case-player'))$('#case-player').onchange=e=>{const p=S.labPlayers?.find(p=>p.id===Number(e.target.value));if(p)$('[name=position]',$('#case-form')).value=p.position;};teaching();};
-const originalReport=renderPlayer;renderPlayer=function(){originalReport();teaching();};
-const bindWithBoard=bindPage;bindPage=function(){bindWithBoard();if($('#target-type')){const el=$('#target-type');el.value=S.targetMode||(S.free?'free':'all');drawTargets();el.onchange=e=>{S.targetMode=e.target.value;S.targetOffset=0;S.free=e.target.value==='free';render();};}if(S.page==='development'){S.pipelineOffset=S.pipelineOffset||0;const list=$('#content .twocol>div');const data=S.pipelineData;if(data)drawPipeline(list,data);} };
-function drawTargets(){const mode=S.targetMode||'all',r=S.targets,offset=S.targetOffset||0,list=$('#target-list');if(mode==='block'){list.innerHTML=note(r.trade_block,true);return;}let ps=mode==='sell'?r.selling:mode==='edges'?r.edges:r.players;const page=ps.slice(offset,offset+12);list.innerHTML=(mode==='edges'?note('Research signals with known salaries up to $8m. Confirm actual acquisition cost; salary alone does not prove an edge.')+page.map(x=>panel(x.player.name,`<p>${badge(x.status,'gold')} ${salary(x.player)}</p><ul>${x.signals.map(v=>`<li>${esc(v)}</li>`).join('')}</ul>${link(x.player)}`)).join(''):rows(page))+`<div class="pagination"><small>${ps.length} candidates · ${ps.length?offset+1:0}–${Math.min(offset+12,ps.length)}</small><div><button data-target-step="-1" ${offset===0?'disabled':''}>Previous</button> <button data-target-step="1" ${offset+12>=ps.length?'disabled':''}>Next</button></div></div>`;}
-function drawPipeline(list,data){const ps=S.draft?data.draft:data.prospects,offset=S.pipelineOffset||0;list.innerHTML=note(data.note)+rows(ps.slice(offset,offset+12))+`<div class="pagination"><small>Ranked shortlist: ${ps.length} · More players in Scouting</small><div><button data-pipeline-step="-1" ${offset===0?'disabled':''}>Previous</button> <button data-pipeline-step="1" ${offset+12>=ps.length?'disabled':''}>Next</button></div></div>`;}
-document.addEventListener('click',e=>{const t=e.target.closest('button');if(t?.dataset.targetStep){S.targetOffset=Math.max(0,(S.targetOffset||0)+Number(t.dataset.targetStep)*12);drawTargets();}if(t?.dataset.pipelineStep){S.pipelineOffset=Math.max(0,(S.pipelineOffset||0)+Number(t.dataset.pipelineStep)*12);drawPipeline($('#content .twocol>div'),S.pipelineData);}});
+"use strict";
+const $ = (q, r = document) => r.querySelector(q),
+  $$ = (q, r = document) => [...r.querySelectorAll(q)];
+const esc = (x) =>
+  String(x ?? "").replace(
+    /[&<>"']/g,
+    (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c],
+  );
+const fmt = (n, d = 0) =>
+    n == null
+      ? "—"
+      : Number(n).toLocaleString("en-US", { minimumFractionDigits: d, maximumFractionDigits: d }),
+  money = (n) =>
+    n == null
+      ? "Not exported"
+      : new Intl.NumberFormat("en-US", {
+          style: "currency",
+          currency: "USD",
+          maximumFractionDigits: 0,
+        }).format(n),
+  cash = (n) =>
+    n == null ? "—" : Math.abs(n) >= 1e6 ? "$" + (n / 1e6).toFixed(1) + "m" : money(n),
+  rate = (n) => (n == null ? "—" : Number(n).toFixed(3).replace(/^0/, "")),
+  pct = (n) => (n == null ? "—" : fmt(n * 100, 1) + "%"),
+  date = (n) => (n ? String(n).slice(0, 10) : "—");
+let S = {
+    status: null,
+    office: null,
+    page: "home",
+    snapshot: "",
+    offset: 0,
+    tab: "Overview",
+    hand: "vsr",
+    internal: false,
+    free: false,
+    position: "",
+    draft: false,
+    leagueTab: "Leaders",
+    role: "Hitters",
+    stat: "Contact",
+    generation: 0,
+  },
+  F = { scope: "organization", q: "", kind: "", sort: "grade", direction: "desc" };
+async function api(path, params = {}, body) {
+  const q = new URLSearchParams(params);
+  if (S.snapshot && !body && !["/api/status", "/api/journal"].includes(path))
+    q.set("snapshot", S.snapshot);
+  const r = await fetch(
+    path + (q.size ? "?" + q : ""),
+    body
+      ? {
+          method: "POST",
+          headers: { "Content-Type": "application/json", "X-GM-Request": "1" },
+          body: JSON.stringify(body),
+        }
+      : {},
+  );
+  const v = await r.json();
+  if (!r.ok) throw Error(v.error || "Request failed");
+  return v;
+}
+function toast(t) {
+  $("#toast").textContent = t;
+  $("#toast").hidden = false;
+  clearTimeout(S.toast);
+  S.toast = setTimeout(() => ($("#toast").hidden = true), 6500);
+}
+const badge = (s, c = "") => `<span class="badge ${c}">${esc(s)}</span>`,
+  note = (s, w = false) => `<div class="note ${w ? "warn" : ""}">${esc(s)}</div>`,
+  empty = (s) => `<div class="empty">${esc(s)}</div>`,
+  panel = (title, body, extra = "") =>
+    `<section class="panel"><div class="panelhead"><h2>${esc(title)}</h2>${extra}</div><div class="panelbody">${body}</div></section>`,
+  head = (title, sub, tag = "FRONT OFFICE") =>
+    `<div class="pagehead"><div><span class="eyebrow">${esc(tag)}</span><h1>${esc(title)}</h1><p>${esc(sub)}</p></div></div>`,
+  metric = (l, v, s = "") =>
+    `<div class="metric"><label>${esc(l)}</label><strong>${v}</strong><small>${esc(s)}</small></div>`,
+  link = (p) =>
+    p.report_available === false
+      ? `<span class="player-name" title="Historical player outside the current scouting cohort">${esc(p.name)}</span>`
+      : `<button class="player-name" data-player="${p.id}">${esc(p.name)}</button>`,
+  salary = (p) =>
+    p.salary_known ? cash(p.salary) : p.free_agent ? "Asking price unknown" : "Salary not exported";
+const bar = (g) =>
+  `<span class="gradebar" role="img" aria-label="Department grade ${fmt(g, 1)} of 10">${Array.from({ length: 10 }, (_, i) => `<i class="${i < Math.round(g) ? (g >= 6 ? "on" : "mid") : ""}"></i>`).join("")}</span>`;
+const tabs = (values, selected, attr) =>
+    `<div class="tabs">${values.map((x) => `<button ${attr}="${esc(x)}" class="${selected === x ? "selected" : ""}">${esc(x)}</button>`).join("")}</div>`,
+  options = (vs, selected) =>
+    vs
+      .map(
+        (x) => `<option value="${esc(x)}" ${x === selected ? "selected" : ""}>${esc(x)}</option>`,
+      )
+      .join("");
+function table(headers, rs) {
+  return `<div class="tablewrap"><table><thead><tr>${headers.map((x) => `<th>${esc(x)}</th>`).join("")}</tr></thead><tbody>${rs.join("")}</tbody></table></div>`;
+}
+function rows(ps, limit = ps.length) {
+  return ps.length
+    ? `<div class="panel playerrows">${ps
+        .slice(0, limit)
+        .map(
+          (p, i) =>
+            `<article class="row"><span class="rank">${i + 1}</span><span class="avatar">${esc(
+              p.name
+                .split(" ")
+                .map((n) => n[0])
+                .slice(0, 2)
+                .join(""),
+            )}</span><div><div class="rowmeta">${link(p)}${badge(p.position)}<small>${esc(p.team)} · ${p.age} · ${esc(p.bats)}/${esc(p.throws)}</small>${p.injured || p.on_dl ? badge("Injured", "red") : ""}${p.locks?.length ? badge("Locked", "gold") : ""}</div><p class="assessment">${esc(p.summary)}</p>${bar(p.grade)}<ul class="evidence"><li>${p.kind === "bat" ? `Forecast ${rate(p.projection.ops)} OPS · ${rate(p.projection.obp)} OBP` : `Forecast ${fmt(p.projection.fip, 2)} FIP · ${pct(p.projection.k_pct)} K`} · ${esc(p.projection.evidence)} evidence</li><li>${esc(p.fit.notes[0])}</li></ul></div><div class="rowright"><div class="big">${fmt(p.grade, 1)}<small>department / 10</small></div><b>${salary(p)}</b><small>${p.end_year ? "Through " + p.end_year + " · " + p.years_left + " seasons" : "Contract needs review"}</small><button data-watch="${p.id}">+ Watch</button></div></article>`,
+        )
+        .join("")}</div>`
+    : empty("No players match this view.");
+}
+function diamond(lineup) {
+  const xy = {
+    C: [230, 255],
+    "1B": [370, 194],
+    "2B": [304, 124],
+    "3B": [90, 194],
+    SS: [156, 124],
+    LF: [75, 58],
+    CF: [230, 33],
+    RF: [385, 58],
+  };
+  return `<svg class="diamond" viewBox="0 0 460 300" role="img" aria-label="Suggested defensive alignment"><path class="outfield" d="M230 270 L25 110 Q230 -75 435 110 Z"/><polygon class="infield" points="230,267 120,180 230,98 340,180"/>${[
+    [230, 260],
+    [122, 180],
+    [230, 100],
+    [338, 180],
+  ]
+    .map(
+      ([x, y]) =>
+        `<rect class="base" x="${x - 4}" y="${y - 4}" width="8" height="8" transform="rotate(45 ${x} ${y})"/>`,
+    )
+    .join("")}${Object.entries(xy)
+    .map(([pos, [x, y]]) => {
+      const p = lineup.find((a) => a.position === pos)?.player;
+      return `<a href="#players" ${p ? `data-player="${p.id}"` : ""}><text class="pos" x="${x}" y="${y}" text-anchor="middle">${pos}</text><text x="${x}" y="${y + 17}" text-anchor="middle">${esc(p ? p.name.split(" ").slice(-1)[0] : "Open")}</text></a>`;
+    })
+    .join("")}</svg>`;
+}
+function rotation(r) {
+  return `<p class="assessment">${esc(r.shape)}</p>${r.rotation.map((x) => `<div class="rotationrow"><span class="rank">${x.slot}</span><div>${x.player ? link(x.player) : "Open slot"}<small>${x.locked ? " · Locked" : ""}${x.player ? " · stamina " + fmt(x.stamina) : ""}</small></div>${bar(x.player?.grade || 0)}<strong>${fmt(x.player?.grade, 1)}</strong></div>`).join("")}`;
+}
+function payrollChart(ys) {
+  const max = Math.max(1, ...ys.map((x) => x.scheduled));
+  return `<svg class="chart" viewBox="0 0 680 230" role="img" aria-label="Scheduled payroll with conditional option salaries"><line x1="30" y1="190" x2="660" y2="190"/>${ys
+    .map((x, i) => {
+      const h = (x.scheduled / max) * 145,
+        ch = (x.conditional / max) * 145,
+        px = 37 + i * 89;
+      return `<rect x="${px}" y="${190 - h}" width="58" height="${h}"><title>${x.year}: ${money(x.scheduled)}</title></rect><rect class="conditional" x="${px}" y="${190 - h}" width="58" height="${ch}"><title>Conditional: ${money(x.conditional)}</title></rect><text x="${px + 29}" y="${180 - h}" text-anchor="middle">${cash(x.scheduled)}</text><text x="${px + 29}" y="212" text-anchor="middle">${x.year}</text>`;
+    })
+    .join("")}</svg>`;
+}
+async function status() {
+  const v = await api("/api/status"),
+    prev = S.status?.snapshot?.id;
+  S.status = v;
+  const m = S.snapshot ? v.snapshots.find((x) => x.id === S.snapshot) : v.snapshot;
+  $("#game-date").textContent =
+    date(m?.game_date) + " · " + (S.snapshot ? "Historical export" : "Latest export");
+  $("#snapshot-foot").textContent = m ? "Captured " + new Date(m.created_at).toLocaleString() : "";
+  $("#snapshot-select").innerHTML =
+    '<option value="">Latest export</option>' +
+    v.snapshots
+      .map(
+        (x) =>
+          `<option value="${esc(x.id)}">${date(x.game_date)} · ${new Date(x.created_at).toLocaleTimeString()}</option>`,
+      )
+      .join("");
+  $("#snapshot-select").value = S.snapshot;
+  $("#refresh").disabled = v.import.running;
+  $("#refresh").textContent = v.import.running ? "Importing…" : "Update Files";
+  $("#notice").hidden = !v.import.error && !v.import.running && !S.snapshot;
+  $("#notice").textContent =
+    v.import.error ||
+    (v.import.running
+      ? v.import.message
+      : "Historical view. Saved preferences and new decisions use the latest export.");
+  if (prev && prev !== v.snapshot?.id && !S.snapshot) {
+    toast("New export imported. Reports updated.");
+    render();
+  }
+}
+async function render() {
+  const gen = ++S.generation;
+  S.page = location.hash.slice(1) || "home";
+  S.page =
+    {
+      briefing: "home",
+      scenario: "lab",
+      journal: "notebook",
+      quality: "guide",
+      connections: "guide",
+    }[S.page] || S.page;
+  $$("nav a").forEach((a) => a.classList.toggle("active", a.hash === "#" + S.page));
+  $("#content").innerHTML = '<div class="loading">Preparing your department’s report…</div>';
+  try {
+    S.office = await api("/api/office");
+    const html = await (
+      {
+        home,
+        blueprint,
+        owner,
+        roster,
+        players,
+        acquisition,
+        finances,
+        development,
+        readiness,
+        direction,
+        lab,
+        league,
+        notebook,
+        guide,
+      }[S.page] || home
+    )();
+    if (gen !== S.generation) return;
+    $("#content").innerHTML = html;
+    bindPage();
+  } catch (e) {
+    if (gen === S.generation)
+      $("#content").innerHTML =
+        `<div class="error"><h2>${S.status?.snapshot ? "Could not open this report" : "Connect your OOTP export"}</h2>${S.status?.snapshot ? "" : "<p>Copy game-access.example.json to game-access.json in the application folder. Set your CSV export folder, team ID and league ID, then choose Update Files. The README includes the setup steps.</p>"}<p>${esc(e.message)}</p><button data-retry>Try again</button></div>`;
+  }
+}
+async function home() {
+  const h = await api("/api/office/home");
+  return (
+    head(
+      "Your club. Your next move.",
+      "The shape of your roster, and the decisions worth your attention.",
+      "BOSTON • " + date(S.status.snapshot.game_date),
+    ) +
+    `<div class="twocol"><div><article class="lead"><span class="eyebrow">THE DEPARTMENT’S READ</span><h2>${esc(h.summary)}</h2><p>${esc(h.blueprint.goal)}</p><div class="actions"><button data-nav="roster" class="primary">Build the best team today</button><button data-nav="lab">Open a decision</button></div></article><div class="metrics">${h.outlook.map((x) => metric(x.name, fmt(x.grade, 1) + "/10", x.count + " healthy selected players")).join("")}${metric("Health flags", h.briefing.injured, "Across the organization")}</div><div class="columns">${panel("The starting five", rotation(h.roster), badge("Preference grades"))}${panel("On the field", diamond(h.roster.lineup), '<button data-nav="roster">Roster lab →</button>')}</div>${panel(
+      "Your attention list",
+      h.briefing.items
+        .slice(0, 3)
+        .map(
+          (x) =>
+            `<div class="attention">${badge(x.priority, "gold")}<h3>${esc(x.title)}</h3><p>${esc(x.detail)}</p></div>`,
+        )
+        .join(""),
+    )}${note("Grades express preferences, not win probabilities. Check assignments in OOTP before using a suggested roster.")}</div><aside>${panel("The plan", `<span class="eyebrow">${S.status.snapshot.season}</span><h2>${esc(h.blueprint.seasons[S.status.snapshot.season])}</h2><p>${esc(h.blueprint.philosophy)} baseball</p><small>Next season: ${esc(h.blueprint.seasons[Number(S.status.snapshot.season) + 1])}</small><p>${h.blueprint.identities.length ? h.blueprint.identities.map((id) => badge(S.office.identities.find((x) => x.id === id).name)).join(" ") : "Choose your baseball identity."}</p><button data-nav="blueprint">Shape our identity →</button>`)}${ownerHome()}${seasonPrediction(h.prediction)}${panel(
+      "Since the last export",
+      h.changes.items
+        .map((x) => `<div class="feeditem"><strong>${esc(x.name)}</strong>${esc(x.change)}</div>`)
+        .slice(0, 8)
+        .join("") || empty(h.changes.note),
+    )}${panel(
+      "Watching",
+      h.watchlist
+        .slice(0, 5)
+        .map(
+          (x) =>
+            `<div class="feeditem">${link({ id: x.player_id, name: x.name })}<p>${esc(x.reason)}</p><small>${esc(x.review)}</small></div>`,
+        )
+        .join("") || empty("Pin players to your watchlist from any report."),
+    )}</aside></div>`
+  );
+}
+async function blueprint() {
+  const b = S.office.state.blueprint,
+    y = S.status.snapshot.season;
+  return (
+    head(
+      "Build a baseball identity.",
+      "Save this year’s direction, next year’s window and the reasons behind changes.",
+      "TEAM BLUEPRINT",
+    ) +
+    `<form id="blueprint-form">${panel("Our competitive window", `<div class="formgrid">${[y, y + 1, y + 2].map((yr) => `<label>${yr} direction<select name="season-${yr}">${options(S.office.modes, b.seasons[yr] || "Hold & evaluate")}</select></label>`).join("")}<label class="wide">The goal<textarea name="goal">${esc(b.goal)}</textarea></label></div>`)}${panel("How we build", `<div class="identitygrid">${S.office.identities.map((i) => `<label class="identity" title="${esc(i.priorities.join(" · "))}"><input type="checkbox" name="identity" value="${i.id}" ${b.identities.includes(i.id) ? "checked" : ""}><strong>${esc(i.name)}</strong><small>${esc(i.tag)}</small><details ${b.identities.includes(i.id) ? "open" : ""}><summary>Department priorities</summary><ul>${i.priorities.map((p) => `<li>${esc(p)}</li>`).join("")}</ul><p>${esc(i.tradeoff)}</p><p>${esc(i.history || "")}</p></details></label>`).join("")}</div><label>Primary identity<select name="primary"><option value="">Choose after selecting identities</option>${S.office.identities.map((i) => `<option value="${i.id}" ${b.identities[0] === i.id ? "selected" : ""}>${esc(i.name)}</option>`).join("")}</select></label>`)}${panel("How we play", `<div class="formgrid"><label>Playing philosophy<select name="philosophy">${options(["Analytics-led", "Traditional", "Blended"], b.philosophy)}</select></label><label>Export review cadence<select name="cadence">${options(["Weekly", "Biweekly", "Monthly", "As needed"], b.cadence)}</select></label><small>Traditional: speed first, strongest bat third, power fourth. Analytics-led and blended use platoon skill rankings with on-base ability near the top.</small></div><div class="skillsgrid">${S.office.skills.map((s) => `<label>${esc(s)}<select name="skill-${esc(s)}">${options(["Essential", "Preferred", "Optional"], b.skills[s])}</select></label>`).join("")}</div>${note("OBP/contact/power and strikeout/control priorities change grade weights. Defense, speed, depth, durability and versatility guide roster review; this is not a calibrated run-value model.")}`)}${panel("Guardrails & this version", `<div class="formgrid"><label class="wide">Budget, prospects and core-player boundaries<textarea name="boundaries">${esc(b.boundaries)}</textarea></label><label class="wide">Why save this plan?<textarea name="reason" required placeholder="Opening season plan, deadline pivot…"></textarea></label></div><button class="primary">Save team blueprint</button>`)} </form>${panel("Blueprint history", S.office.state.versions.map((v) => `<div class="feeditem"><strong>${date(v.game_date)} · ${esc(v.blueprint.reason)}</strong><details><summary>Saved version</summary><pre>${esc(JSON.stringify(v.blueprint, null, 2))}</pre></details></div>`).join("") || empty("Your first saved plan starts the timeline."))}`
+  );
+}
+function lockList() {
+  return (
+    S.office.state.locks
+      .map(
+        (x) =>
+          `<div class="locklist"><strong>${esc(x.name)}</strong> ${badge(x.scope, "gold")}<small> ${esc(x.position)} ${x.slot ? "slot " + x.slot : ""} ${x.hand === "both" ? "" : esc(x.hand)}</small><p>${esc(x.reason || "Locked by the GM")}</p><button data-unlock="${x.id}">Approve removing this lock</button></div>`,
+      )
+      .join("") || empty("No standing locks. Add one from a player report or roster lab.")
+  );
+}
+async function roster() {
+  const r = await api("/api/office/roster", { hand: S.hand, internal: S.internal ? "1" : "0" });
+  return (
+    head(
+      "The best team today.",
+      "Healthy active players and organizational alternatives, shaped by matchups, defense and your locks.",
+      "ROSTER LAB",
+    ) +
+    `<div class="filters">${tabs(["vs right-handers", "vs left-handers"], S.hand === "vsr" ? "vs right-handers" : "vs left-handers", "data-hand")}<label><input id="internal" type="checkbox" ${S.internal ? "checked" : ""}> Include healthy minor-league options</label><button data-lock-open>Add a binding lock</button></div>${r.warnings.map((x) => note(x, true)).join("")}<div class="twocol"><div><div class="columns">${panel("Defensive alignment", diamond(r.lineup))}${panel(
+      "Batting order",
+      table(
+        ["Order", "Player", "Position", "Grade"],
+        r.lineup.map(
+          (x) =>
+            `<tr><td>${x.slot}</td><td>${link(x.player)} ${x.locked ? badge("Locked", "gold") : ""}<small>${x.player.active ? "" : " · Internal alternative"}</small></td><td>${x.position}</td><td>${fmt(x.player.grade, 1)}</td></tr>`,
+        ),
+      ),
+    )}</div>${r.moves ? rosterMovePlan(r.moves) : ""}${panel(
+      "Bench & roster coverage",
+      table(
+        ["Player", "Position", "Grade"],
+        r.bench.map(
+          (p) => `<tr><td>${link(p)}</td><td>${p.position}</td><td>${fmt(p.grade, 1)}</td></tr>`,
+        ),
+      ),
+      badge(r.selected_count + " selected"),
+    )}${panel("Starting rotation & pitch limits", startingPitchPlan(r))}${panel("Bullpen roles & usage", bullpenRolePlan(r))}${r.unfilled.length ? note("Unfilled: " + r.unfilled.join(", "), true) : ""}${note(r.method)}</div><aside>${panel("Binding locks", lockList())}${panel(
+      "Depth & coverage",
+      r.depth
+        .filter((x) => x.position !== "P")
+        .map(
+          (x) =>
+            `<div class="feeditem"><strong>${x.position} · ${x.players.length} active options</strong><small>Organization: ${x.reserves.map((p) => p.name).join(", ") || "No qualified healthy backup"}</small></div>`,
+        )
+        .join(""),
+    )}${panel("Promotion review", '<p>Open an internal player for service time, 40-man status, options, contract and minor-league history.</p><button data-nav="lab">Promote or find outside help →</button>')}</aside></div>`
+  );
+}
+async function players() {
+  const r = await api("/api/office/players", { ...F, offset: S.offset });
+  return (
+    head(
+      "Read the player, not just the number.",
+      "Plain-language assessments, the supporting evidence, and the contract that comes with the talent.",
+      "SCOUTING DEPARTMENT",
+    ) +
+    `<div class="filters"><input id="player-search" type="search" placeholder="Find a player" aria-label="Find a player" value="${esc(F.q)}"><select id="scope" aria-label="Player group">${[
+      ["organization", "Our organization"],
+      ["active", "Healthy active"],
+      ["mlb", "Current MLB"],
+      ["all", "All players"],
+      ["draft", "Draft eligible"],
+    ]
+      .map(([v, t]) => `<option value="${v}" ${F.scope === v ? "selected" : ""}>${t}</option>`)
+      .join("")}</select><select id="kind" aria-label="Player type">${[
+      ["", "Hitters & pitchers"],
+      ["bat", "Hitters"],
+      ["pit", "Pitchers"],
+    ]
+      .map(([v, t]) => `<option value="${v}" ${F.kind === v ? "selected" : ""}>${t}</option>`)
+      .join("")}</select><select id="sort" aria-label="Sort">${[
+      ["grade", "Department fit"],
+      ["engine_potential", "Potential"],
+      ["salary", "Salary"],
+      ["age", "Age"],
+      ["name", "Name"],
+    ]
+      .map(([v, t]) => `<option value="${v}" ${F.sort === v ? "selected" : ""}>${t}</option>`)
+      .join(
+        "",
+      )}</select><button id="direction">${F.direction === "desc" ? "↓" : "↑"}</button></div>${rows(r.players)}<div class="pagination"><small>${r.total} players · ${S.offset + 1}–${Math.min(S.offset + 12, r.total)}</small><div><button id="prev" ${S.offset === 0 ? "disabled" : ""}>Previous</button> <button id="next" ${S.offset + 12 >= r.total ? "disabled" : ""}>Next</button></div></div>`
+  );
+}
+async function acquisition() {
+  const r = await api("/api/office/acquisition", {
+    free: S.free ? "1" : "0",
+    position: S.position,
+  });
+  S.targets = r;
+  return (
+    head(
+      "Find the right help.",
+      "Compare outside possibilities with our depth before paying for a move.",
+      "ACQUISITION DESK",
+    ) +
+    `<div class="filters"><select id="target-type" aria-label="Target group"><option value="all" ${!S.free ? "selected" : ""}>Need-based inquiries</option><option value="free" ${S.free ? "selected" : ""}>Free agents only</option><option value="premium">Premium trade targets</option><option value="universe">Full outside scouting universe</option><option value="sell">Our selective sale candidates</option><option value="block">Trade-block status</option><option value="edges">Edgehunter research board</option></select><select id="target-pos" aria-label="Position"><option value="">All positions</option>${options(["P", "C", "1B", "2B", "3B", "SS", "LF", "CF", "RF", "DH"], S.position)}</select></div><div class="twocol"><div id="target-list">${rows(r.players, 40)}</div><aside>${panel("Current role options", r.internal.map((x) => `<div class="feeditem">${link(x)}<small>${esc(x.comparison_role || x.position)} · ${fmt(x.grade, 1)}/10 · ${salary(x)}</small></div>`).join("") || empty("No internal match."))}${panel("Modern Moneyball", `<p>${esc(r.edge)}</p><small>A useful skill becomes an edge when its price is lower than its role value. Exports do not include demands or trade acceptance.</small>`)}${panel("Trading block", `<p>${esc(r.trade_block)}</p>`)}</aside></div>`
+  );
+}
+async function finances() {
+  const f = await api("/api/office/finances");
+  return (
+    head(
+      "What can we spend?",
+      "The exported funds, commitments and decisions shaping the next window.",
+      "FINANCE & CONTRACTS",
+    ) +
+    `<div class="lead"><span class="eyebrow">EXPORTED CASH TRADES AVAILABLE · VERIFY AGAINST THE GAME SCREEN</span><h1>${cash(f.reported_funds)}</h1><p>Confirm that this matches OOTP’s money for the transaction you intend.</p></div><div class="metrics">${metric("Game payroll", cash(f.financials.player_payroll))}${metric("Owner budget", cash(f.financials.budget))}${metric("Budget less payroll", cash(f.budget_less_payroll), "Context; not spendable cash")}${metric("Schedule gap", cash(f.reconciliation_difference), "Game payroll minus contracts")}</div><div class="twocol"><div>${panel(
+      "The next seven seasons",
+      payrollChart(f.schedule) +
+        table(
+          ["Season", "Plan", "Non-option schedule", "Conditional options", "Total"],
+          f.schedule.map(
+            (x) =>
+              `<tr><td>${x.year}</td><td>${esc(x.mode)}</td><td>${cash(x.non_option)}</td><td>${cash(x.conditional)}</td><td>${cash(x.scheduled)}</td></tr>`,
+          ),
+        ),
+      badge("Light green = options"),
+    )}${panel("Paid contracts with no future scheduled year", rows(f.expiring, 12))}</div><aside>${panel("Arbitration review · " + f.arbitration_review_year, f.arbitration_review.map((p) => `<div class="feeditem">${link(p)}<small>${p.service_years} service years · ${salary(p)}</small></div>`).join("") || empty("No ordinary arbitration candidates under these rules."))}${panel("Before treating this as payroll room", `<p>${esc(f.note)}</p>${note("The " + cash(f.reconciliation_difference) + " gap remains visible. Bonuses, renewals and retention need game confirmation.", true)}<button data-nav="lab">Evaluate a contract →</button>`)}</aside></div>`
+  );
+}
+async function development() {
+  const r = await api("/api/office/development");
+  S.pipelineData = r;
+  return (
+    head(
+      "Keep the next contender coming.",
+      "Talent first. Organizational needs break ties within a potential tier.",
+      "DEVELOPMENT & DRAFT",
+    ) +
+    tabs(
+      ["Our pipeline", "Draft board"],
+      S.draft ? "Draft board" : "Our pipeline",
+      "data-pipeline",
+    ) +
+    `<div class="twocol"><div>${note(S.draft ? r.note : "Ranked by exported potential. Open reports for current readiness, minor-league history and promotion costs.")}${rows(S.draft ? r.draft : r.prospects, 40)}</div><aside>${panel(
+      "Minor-league position depth",
+      table(
+        ["Position", "Players"],
+        Object.entries(r.depth)
+          .sort((a, b) => a[1] - b[1])
+          .map(([p, n]) => `<tr><td>${p}</td><td>${n}</td></tr>`),
+      ),
+    )}${panel(
+      "Development changes",
+      r.changes
+        .slice(0, 15)
+        .map(
+          (x) =>
+            `<div class="feeditem">${link(x)}<small>Current value ${fmt(x.current_change)} · potential ${fmt(x.potential_change)}</small></div>`,
+        )
+        .join("") || empty("No recorded change."),
+    )}${panel("Draft discipline", "<p>A stronger multi-tool outfielder can retain more value than a weaker infielder even when our infield is thin.</p><small>Potential, signing demands, availability and outcomes need review.</small>")}</aside></div>`
+  );
+}
+async function lab() {
+  const ps = (await api("/api/office/players", { scope: "organization", limit: 500 })).players;
+  S.labPlayers = ps;
+  return (
+    head(
+      "A decision, with the whole picture.",
+      "Compare doing nothing with a promotion, acquisition, contract or selective sale.",
+      "DECISION LAB",
+    ) +
+    `<div class="twocol"><div>${panel("Open a case", `<form id="case-form"><div class="formgrid"><label>Decision type<select name="type" id="case-type">${options(["Replacement", "Promotion", "Signing", "Trade", "Extension", "Deadline plan"], "Replacement")}</select></label><label>Player<select name="player_id" id="case-player"><option value="">Select a player / need</option>${ps.map((p) => `<option value="${p.id}">${esc(p.name)} · ${p.position}</option>`).join("")}</select></label><label>Position need<select name="position">${options(["P", "C", "1B", "2B", "3B", "SS", "LF", "CF", "RF", "DH"], "P")}</select></label><label class="wide">Your question<input name="question" placeholder="Who replaces our injured starter without weakening next year?"></label><label>Scenario direction<select name="scenario_mode">${options(S.office.modes, S.office.state.blueprint.seasons[S.status.snapshot.season])}</select></label><label>Assumed annual offer ($)<input name="annual_offer" type="number" min="0" max="100000000" value="0"></label><label>Offer length (years)<input name="offer_years" type="number" min="1" max="15" value="1"></label><label>Extension start year<input name="start_year" type="number" value="${S.status.snapshot.season + 1}"></label><label>Assumed added service days<input name="added_service_days" type="number" min="0" max="172" value="0"></label><label>Player ID override (outside target)<input name="custom_player" type="number"></label><label>Outgoing player IDs<input name="send" placeholder="Comma-separated IDs"></label><label>Incoming player IDs<input name="receive" placeholder="Comma-separated IDs"></label><label class="wide"><input type="checkbox" name="override"> Evaluate an unlocked trade scenario only; keep standing protections saved</label></div><div class="actions"><button class="primary">Compare the alternatives</button><button type="button" id="save-case" disabled>Save this case</button></div></form>`)}<div id="case-report">${empty("Choose a question. The department brings evidence, alternatives and ramifications.")}</div></div><aside>${panel("Standing constraints", lockList())}${panel("The GM’s questions", '<div class="feeditem"><strong>Injured starter?</strong>Internal depth or a temporary free agent.</div><div class="feeditem"><strong>Promote or wait?</strong>Readiness, service time, roster cost and playing time.</div><div class="feeditem"><strong>Extend or trade?</strong>Contract, alternatives and the next two seasons.</div><div class="feeditem"><strong>Sell without tearing down?</strong>Expiring pieces first; protect next year’s core.</div>')}${panel(
+      "Saved cases",
+      S.office.state.decisions
+        .slice(0, 10)
+        .map(
+          (x) =>
+            `<div class="feeditem"><button data-case="${x.id}">${esc(x.report.question)}</button><small>${date(x.game_date)} · ${esc(x.status)}</small><select data-case-status="${x.id}" aria-label="Case status">${options(["Exploring", "Chosen", "Applied in OOTP", "Revisit"], x.status)}</select></div>`,
+        )
+        .join("") || empty("No cases saved yet."),
+    )}</aside></div>`
+  );
+}
+function caseReport(r) {
+  return (
+    ownerContextPanel(r.owner_goals) +
+    panel(
+      "The department’s recommendation",
+      `<h2>${esc(r.recommendation)}</h2><p>${esc(r.why)}</p>${badge(r.locks_respected ? "Standing locks respected" : "Unlocked scenario only", r.locks_respected ? "green" : "gold")} ${badge(r.scenario_mode)}<p><small>Captured ${date(r.game_date)} · offers, service days and scenario direction are assumptions.</small></p>`,
+    ) +
+    panel(
+      "Alternatives",
+      r.alternatives
+        .map(
+          (x) =>
+            `<div class="attention"><h3>${x.player_id ? link({ id: x.player_id, name: x.name }) : esc(x.name)}</h3><p>${esc(x.summary)}</p></div>`,
+        )
+        .join(""),
+    ) +
+    (r.internal ? panel("Internal options", rows(r.internal, 3)) : "") +
+    (r.external ? panel("Temporary outside help", rows(r.external, 3)) : "") +
+    (r.candidates ? panel("Selective sale review", rows(r.candidates, 10)) : "") +
+    (r.incoming
+      ? panel("Incoming fit", rows(r.incoming)) + panel("Outgoing cost", rows(r.outgoing))
+      : "") +
+    (r.package
+      ? panel(
+          "Scheduled payroll change",
+          table(
+            ["Season", "Change"],
+            r.package.years.map(
+              (x) => `<tr><td>${x.year}</td><td>${money(x.payroll_change)}</td></tr>`,
+            ),
+          ) + r.package.flags.map((x) => note(x, true)).join(""),
+        )
+      : "") +
+    (r.player
+      ? panel(
+          "Player & contract",
+          r.player.player
+            ? rows([r.player.player]) + contractTable(r.player.contract_schedule)
+            : rows([r.player]),
+        )
+      : "") +
+    (r.service_scenario
+      ? panel(
+          "Illustrative service-time scenario",
+          `<div class="metrics">${metric("Current total days", r.service_scenario.current_days)}${metric("Assumed new days", r.service_scenario.assumed_added_days)}${metric("Illustrative total", r.service_scenario.projected_total)}</div>${note(r.service_scenario.note, true)}${r.promotion.notes.map((x) => `<p>${esc(x)}</p>`).join("")}`,
+        )
+      : "") +
+    (r.financial_context
+      ? panel(
+          "Cost & spending context",
+          `<div class="metrics">${metric("Exported funds", cash(r.financial_context.reported_cash_trades_available))}${metric("Manual offer total", cash(r.financial_context.manual_offer_total))}</div>${note(r.financial_context.note)}`,
+        )
+      : "") +
+    panel(
+      "Before making the move",
+      `<ul>${r.checks.map((x) => `<li>${esc(x)}</li>`).join("")}</ul><small>Mark “Applied in OOTP” after making the change yourself. Saving does not move players.</small>`,
+    )
+  );
+}
+async function league() {
+  const r = await api("/api/office/league", { year: S.leagueYear || "" });
+  S.league = r;
+  r.batting.sort((a, b) => (b[S.batMetric || "ops"] || 0) - (a[S.batMetric || "ops"] || 0));
+  r.pitching = S.pitchGroup === "Relievers" ? r.relievers : r.pitching;
+  r.pitching.sort((a, b) =>
+    ["era", "fip", "whip"].includes(S.pitMetric || "fip")
+      ? (a[S.pitMetric || "fip"] ?? 99) - (b[S.pitMetric || "fip"] ?? 99)
+      : (b[S.pitMetric] || 0) - (a[S.pitMetric] || 0),
+  );
+  r.batting = r.batting.slice(0, 20);
+  r.pitching = r.pitching.slice(0, 20);
+  return (
+    head(
+      "Know the league you’re building for.",
+      "League leaders, rating distributions and the standards behind our language.",
+      "LEAGUE INTELLIGENCE",
+    ) +
+    tabs(
+      ["Leaders", "Rating benchmarks", "Stat standards", "Checkpoints", "Standings"],
+      S.leagueTab,
+      "data-league",
+    ) +
+    `<div class="filters"><label>Stats season<select id="league-year">${options(r.years.map(String), String(r.year))}</select></label><label>Hitter ranking<select id="bat-metric">${options(["ops", "obp", "avg", "hr", "war"], S.batMetric || "ops")}</select></label><label>Pitching group<select id="pitch-group">${options(["Starters / full workload", "Relievers"], S.pitchGroup || "Starters / full workload")}</select></label><label>Pitcher ranking<select id="pit-metric">${options(["fip", "era", "whip", "k_bb_pct", "war", "s"], S.pitMetric || "fip")}</select></label></div>` +
+    (S.leagueTab === "Leaders"
+      ? `<div class="metrics">${metric(r.year + " league OPS", rate(r.baseline_bat.ops))}${metric("League OBP", rate(r.baseline_bat.obp))}${metric("League ERA", fmt(r.baseline_pit.era, 2))}${metric("League K−BB%", pct(r.baseline_pit.k_bb_pct))}</div>${note(r.note)}<div class="columns">${panel(
+          r.year + " hitters · " + (S.batMetric || "ops").toUpperCase() + " leaders",
+          table(
+            ["Player", "PA", "AVG", "OBP", "OPS", "HR", "WAR"],
+            r.batting.map(
+              (p) =>
+                `<tr><td>${link(p)}</td><td>${p.pa}</td><td>${rate(p.avg)}</td><td>${rate(p.obp)}</td><td>${rate(p.ops)}</td><td>${p.hr}</td><td>${fmt(p.war, 1)}</td></tr>`,
+            ),
+          ),
+          badge("Minimum " + r.pa_min + " PA"),
+        )}${panel(
+          r.year + " pitchers · " + (S.pitMetric || "fip").toUpperCase() + " leaders",
+          table(
+            ["Player", "IP", "ERA", "FIP", "K−BB%", "WAR"],
+            r.pitching.map(
+              (p) =>
+                `<tr><td>${link(p)}</td><td>${p.ip_display}</td><td>${fmt(p.era, 2)}</td><td>${fmt(p.fip, 2)}</td><td>${pct(p.k_bb_pct)}</td><td>${fmt(p.war, 1)}</td></tr>`,
+            ),
+          ),
+          badge("Minimum " + (S.pitchGroup === "Relievers" ? "30" : fmt(r.outs_min / 3)) + " IP"),
+        )}</div>`
+      : S.leagueTab === "Standings"
+        ? panel(
+            "Current exported standings",
+            table(
+              ["Club", "W", "L", "PCT", "GB"],
+              r.standings.map(
+                (x) =>
+                  `<tr><td>${esc(x.name)}</td><td>${x.w}</td><td>${x.l}</td><td>${fmt(x.pct, 3)}</td><td>${fmt(x.gb, 1)}</td></tr>`,
+              ),
+            ),
+          )
+        : S.leagueTab === "Rating benchmarks"
+          ? benchmarkView(r)
+          : S.leagueTab === "Stat standards"
+            ? panel(
+                "Standards from this league",
+                note(
+                  "Empirical cutoffs among qualified players. Lower ERA/FIP is better. Ratings and performance are different benchmarks.",
+                ) +
+                  table(
+                    ["Stat", "Sample", "10th", "25th", "Median", "75th", "90th", "95th"],
+                    Object.entries(r.bands).map(
+                      ([key, v]) =>
+                        `<tr><td>${key.toUpperCase()} ${v.lower_better ? "↓" : ""}</td><td>${v.n}</td>${[10, 25, 50, 75, 90, 95].map((q) => `<td>${key.includes("pct") ? pct(v.cutoffs[q]) : ["era", "fip"].includes(key) ? fmt(v.cutoffs[q], 2) : rate(v.cutoffs[q])}</td>`).join("")}</tr>`,
+                    ),
+                  ),
+              ) +
+              panel(
+                "Performance language",
+                table(
+                  ["Relative result", "Meaning"],
+                  [
+                    ["Bottom 10%", "Poor within qualified sample"],
+                    ["10–25%", "Below average"],
+                    ["25–75%", "Around the middle"],
+                    ["75–90%", "Good / above average"],
+                    ["90–95%", "Excellent"],
+                    ["Top 5%", "Elite in this stat; superstar status requires broader value"],
+                  ].map((x) => `<tr><td>${x[0]}</td><td class="wrap">${x[1]}</td></tr>`),
+                ),
+              )
+            : panel(
+                "Three rating checkpoints",
+                `<p>Capture an actual export at the start, All-Star break and end. Dates that were never exported cannot have a rating history.</p><div class="actions">${["Opening season", "All-Star break", "End of season"].map((x) => `<button data-checkpoint="${x}">Label current export: ${x}</button>`).join("")}</div>${r.checkpoints.map((x) => `<div class="feeditem"><strong>${esc(x.label)} · ${x.year}</strong><small>${date(x.game_date)} · ${esc(x.snapshot)}</small></div>`).join("") || empty("No checkpoints yet.")}`,
+              ))
+  );
+}
+function benchmarkView(r) {
+  const a = r.distributions.filter((x) => x.role === S.role);
+  if (!a.some((x) => x.label === S.stat)) S.stat = a[0]?.label;
+  const d = a.find((x) => x.label === S.stat);
+  if (!d) return empty("No rating cohort.");
+  const mx = Math.max(...d.scale.map((x) => x.count), 1);
+  return `<div class="filters"><select id="benchmark-role" aria-label="Cohort">${options(["Hitters", "Starters", "Relievers"], S.role)}</select><select id="benchmark-stat" aria-label="Skill">${options(
+    a.map((x) => x.label),
+    S.stat,
+  )}</select></div><div class="twocol"><div>${panel(
+    S.role + " · " + d.label,
+    `<div class="metrics">${metric("League mean", fmt(d.mean, 2) + "/10", d.n + " assigned MLB players")}${metric("A 5’s percentile", fmt(d.scale[4].percentile, 1) + "%", d.scale[4].tied + "% tied")}</div><div class="distribution">${d.scale.map((x) => `<div><svg viewBox="0 0 40 75" preserveAspectRatio="none"><rect x="4" y="${75 - (65 * x.count) / mx}" width="32" height="${(65 * x.count) / mx}" fill="#35784d"><title>${x.count} players rated ${x.rating}</title></rect></svg>${x.rating}</div>`).join("")}</div>${table(
+      ["Rating", "Players", "Below", "Tied", "Above", "Midpoint percentile"],
+      d.scale.map(
+        (x) =>
+          `<tr><td>${x.rating}/10</td><td>${x.count}</td><td>${x.lower}%</td><td>${x.tied}%</td><td>${x.higher}%</td><td>${x.percentile}%</td></tr>`,
+      ),
+    )}`,
+  )}</div><aside>${panel("Why 5 is not automatically average", `<p>A rating describes the displayed skill. The distribution tells you where it stands in this save.</p><p>${d.scale[4].lower}% are below a 5; ${d.scale[4].tied}% are tied. We allocate half the ties below for the midpoint percentile.</p><small>Pitching cohorts use stamina and recent MLB usage; role inference is a heuristic.</small>`)}</aside></div>`;
+}
+async function notebook() {
+  const j = await api("/api/journal");
+  return (
+    head(
+      "Keep the reasons, not just the moves.",
+      "Watchlists, cases and notes preserve what you knew at the time.",
+      "GM NOTEBOOK",
+    ) +
+    `<div class="twocol"><div>${panel("Write a note", `<form id="journal-form"><label>Your reasoning<textarea name="text" required></textarea></label><button class="primary">Save note</button></form>`)}${panel("Decision timeline", S.office.state.decisions.map((x) => `<div class="feeditem"><strong>${esc(x.report.question)}</strong>${badge(x.status)}<small>${date(x.game_date)}</small><p>${esc(x.report.recommendation)}</p><button data-note-case="${x.id}">Open full case</button></div>`).join("") || empty("Saved cases appear here."))}${panel("Notes", j.map((x) => `<div class="feeditem"><small>${date(x.game_date)}</small><p>${esc(x.text)}</p></div>`).join("") || empty("No notes yet."))}</div><aside>${panel("Watchlist", S.office.state.watchlist.map((x) => `<div class="feeditem">${link({ id: x.player_id, name: x.name })}<p>${esc(x.reason)}</p><small>Review: ${esc(x.review)}</small><button data-unwatch="${x.id}">Remove from watchlist</button></div>`).join("") || empty("Watch a player from scouting."))}${panel("Locks", lockList())}</aside></div>`
+  );
+}
+async function guide() {
+  const q = await api("/api/quality");
+  return (
+    head(
+      "Understand the department.",
+      "Definitions, transparent methods and the limits of the files.",
+      "FIELD GUIDE",
+    ) +
+    tabs(
+      ["Definitions", "Data & methods", "Jev connection"],
+      S.guideTab || "Definitions",
+      "data-guide",
+    ) +
+    ((S.guideTab || "Definitions") === "Definitions"
+      ? `<div class="filters"><input id="guide-search" type="search" placeholder="Find OPS, service time, percentiles…" aria-label="Search definitions"></div><section class="panel" id="definitions">${S.office.glossary.map((x) => `<article class="guideitem" data-term="${esc((x.term + " " + x.definition).toLowerCase())}"><h3>${esc(x.term)}</h3><p>${esc(x.definition)}</p></article>`).join("")}</section>`
+      : S.guideTab === "Jev connection"
+        ? panel(
+            "A second analytical reader",
+            `<p>Jev is ${S.status.jev.configured ? "connected and ready" : "not connected"}. Reports offer a structured role/evidence review. The department still writes the summary and performs calculations.</p><small>Cached judgments are not probabilities of baseball success.</small><details><summary>Update connection</summary><form id="jev-form"><label>API key<input type="password" name="key" autocomplete="off" required></label><label><input type="checkbox" name="remember" checked> Remember securely on this PC</label><button>Save key</button></form></details>`,
+          )
+        : `${panel(
+            "Fact, calculation, inference or missing?",
+            table(
+              ["Layer", "Meaning"],
+              [
+                [
+                  "Exported fact",
+                  "Ratings, contracts, roster flags, recorded counts and park factors.",
+                ],
+                [
+                  "Calculation",
+                  "OPS/FIP, schedules, tie-aware percentiles and weighted park factors.",
+                ],
+                ["Inference", "Role, grade, suggestions and provisional recommendations."],
+                [
+                  "Unverified",
+                  "Trade-block codes, asking prices, acceptance and exact move legality.",
+                ],
+              ].map((x) => `<tr><td>${x[0]}</td><td class="wrap">${x[1]}</td></tr>`),
+            ),
+          )}${panel("Forecasts & validation", q.limitations.map((x) => `<p>${esc(x)}</p>`).join("") + `<details><summary>Backtest evidence</summary><pre>${esc(JSON.stringify(q.backtests, null, 2))}</pre></details>`)}${panel("Imports", `<p>Update Files checks for completed, stable CSVs. Export from OOTP first. Failed imports preserve the last valid snapshot.</p><a href="/api/export" download="organization.csv">Download organization CSV</a><details><summary>Source & audit</summary><pre>${esc(JSON.stringify({ source: S.status.source, manifest: q.manifest }, null, 2))}</pre></details>`)}`)
+  );
+}
+function contractTable(rs) {
+  return rs.length
+    ? table(
+        ["Year", "Salary", "Terms", "Buyout", "Source"],
+        rs.map(
+          (x) =>
+            `<tr><td>${x.year}</td><td>${money(x.salary)}</td><td>${esc(x.type)}</td><td>${money(x.buyout)}</td><td>${esc(x.source)}</td></tr>`,
+        ),
+      )
+    : empty("No future scheduled contract years exported.");
+}
+async function openPlayer(id) {
+  const dlg = $("#player-dialog");
+  if (!dlg.open) dlg.showModal();
+  $("#player-content").innerHTML = '<div class="loading">Opening the full report…</div>';
+  try {
+    S.report = await api("/api/office/player", { id });
+    S.tab = "Overview";
+    renderPlayer();
+  } catch (e) {
+    $("#player-content").innerHTML = `<div class="error">${esc(e.message)}</div>`;
+  }
+}
+function renderPlayer() {
+  const r = S.report,
+    p = r.player;
+  $("#player-content").innerHTML = `<header class="playerhero"><span class="avatar">${esc(
+    p.name
+      .split(" ")
+      .map((x) => x[0])
+      .slice(0, 2)
+      .join(""),
+  )}</span><div><span class="eyebrow">${esc(p.team)} · ${p.position} · AGE ${p.age} · ${esc(p.bats)}/${esc(p.throws)}</span><h1>${esc(p.name)}</h1>${badge(p.injured || p.on_dl ? "Injury review" : p.active ? "Active roster" : "Internal / outside option", p.injured ? "red" : "green")} ${p.locks.length ? badge("GM locked", "gold") : ""}<small> Player ID ${p.id}</small></div><div class="contractmini"><div class="big">${salary(p)}</div><small>${p.end_year ? "Through " + p.end_year + " · " + p.years_left + " seasons including current" : "Contract needs review"}</small><small>${cash(p.scheduled_total)} remaining scheduled</small></div></header><div class="reporttabs">${tabs(["Overview", "Skills", "Performance", "Team fit", "Contract", "Decision history"], S.tab, "data-report-tab")}</div><section class="reportbody">${playerBody(r)}</section>`;
+}
+function playerBody(r) {
+  const p = r.player,
+    f = r.projection,
+    bat = p.kind === "bat";
+  if (S.tab === "Overview")
+    return `<article class="lead"><h2>${esc(p.summary)}</h2><p>${esc(p.detail)}</p></article><div class="metrics">${metric("Department fit", fmt(p.grade, 1) + "/10", "Preference grade, not predicted wins")}${metric(bat ? "Forecast OPS" : "Forecast FIP", bat ? rate(f.ops) : fmt(f.fip, 2), "Conservative MLB forecast")}${metric("MLB evidence", fmt(f.observed_exposure), bat ? "Prior-season PA" : "Prior-season batters faced")}</div><div class="columns">${panel(
+      "Why we see it this way",
+      r.why
+        .filter((x) => !x.includes("engine current value"))
+        .map((x) => `<p>${esc(x)}</p>`)
+        .join("") +
+        `<p>${esc(p.fit.notes[0])}</p>${r.interval ? note("Historical error band: " + fmt(r.interval.low, bat ? 3 : 2) + "–" + fmt(r.interval.high, bat ? 3 : 2) + " " + (bat ? "OPS" : "FIP") + ". Population range; not a personal guarantee.") : note("Limited history: no personalized range available.")}`,
+    )}${panel("Your next action", `<div class="actions"><button data-player-lock="${p.id}">Lock this player</button><button data-watch="${p.id}">Add to watchlist</button><button id="jev-review">Ask Jev for a second read</button><button id="print-report">Print</button></div><div id="jev-result"></div><p><small>Review injury, roster and contract implications before changing assignments.</small></p>`)}</div>`;
+  if (S.tab === "Skills")
+    return `<div class="columns">${panel("Current skills & future potential", r.skills.map((x) => `<div class="skillbox"><div class="skilltitle"><span>${esc(x.label)}</span><strong>${fmt(x.current)}/10</strong></div><div class="skilltrack"><svg viewBox="0 0 100 9" preserveAspectRatio="none"><rect x="0" y="0" width="${Math.min(100, x.current * 10)}" height="9" fill="#35784d"/></svg></div><small>Potential ${fmt(x.potential)}/10 · ${fmt(x.percentile, 1)}th midpoint percentile of ${x.n} MLB ${x.cohort.toLowerCase()}</small><small>Mean ${fmt(x.mean, 2)} · ${x.lower}% below / ${x.tied}% tied / ${x.higher}% above</small><small>vs R ${fmt(x.vsr)} · vs L ${fmt(x.vsl)}</small></div>`).join(""))}${panel("Defense, running & repertoire", ratingsTable(r))}</div>${panel(
+      "Rating history",
+      r.rating_history.length > 1
+        ? table(
+            ["Export date", ...r.skills.map((x) => x.label)],
+            r.rating_history.map(
+              (x) =>
+                `<tr><td>${date(x.game_date)}</td>${r.skills.map((k) => `<td>${fmt(x.ratings[k.label])}</td>`).join("")}</tr>`,
+            ),
+          )
+        : empty("The first capture establishes the baseline. Future exports build this history."),
+    )}${note("Contact is composite. BABIP and avoid-K are shown for diagnosis, without adding them again to contact in the grade.")}`;
+  if (S.tab === "Performance") {
+    const hs = r.histories[bat ? "bat" : "pit"];
+    return (
+      panel(
+        "Recorded season history",
+        table(
+          bat
+            ? ["Year", "League", "PA", "AVG", "OBP", "SLG", "OPS", "HR", "BB%", "K%", "WAR"]
+            : ["Year", "League", "IP", "ERA", "FIP", "K%", "BB%", "WAR"],
+          hs
+            .slice(0, 18)
+            .map(
+              (x) =>
+                `<tr><td>${x.year}</td><td>${esc(x.league)}</td>${bat ? `<td>${x.pa}</td><td>${rate(x.avg)}</td><td>${rate(x.obp)}</td><td>${rate(x.slg)}</td><td>${rate(x.ops)}</td><td>${x.hr}</td><td>${pct(x.bb_pct)}</td><td>${pct(x.k_pct)}</td>` : `<td>${x.ip_display}</td><td>${fmt(x.era, 2)}</td><td>${fmt(x.fip, 2)}</td><td>${pct(x.k_pct)}</td><td>${pct(x.bb_pct)}</td>`}<td>${fmt(x.war, 1)}</td></tr>`,
+            ),
+        ),
+      ) +
+      panel(
+        "When results do not match talent",
+        `<p>Check playing time, level, handedness, injuries, BB%, K% and BABIP against the player’s history and the league. A high rating is evidence of talent, not a guaranteed average.</p>${note("Minor-league stats stay at their actual level. Historical handedness split codes are unverified; platoon suggestions use explicitly named vs-L/vs-R ratings.", true)}<details><summary>Split records & fielding evidence</summary><pre>${esc(JSON.stringify({ splits: r.splits, fielding: r.fielding }, null, 2))}</pre></details>`,
+      )
+    );
+  }
+  if (S.tab === "Team fit")
+    return `<div class="columns">${panel(
+      "Our park & league",
+      `<h2>${esc(p.fit.home)}</h2>${p.fit.notes.map((x) => `<p>${esc(x)}</p>`).join("")}${table(
+        ["Factor", "Home", "Schedule weighted"],
+        [
+          ["Average", "avg"],
+          ["Doubles", "d"],
+          ["Triples", "t"],
+          ["HR, left-handed", "hr_l"],
+          ["HR, right-handed", "hr_r"],
+        ].map(
+          ([l, k]) =>
+            `<tr><td>${l}</td><td>${fmt(r.schedule.home[k], 3)}</td><td>${fmt(r.schedule.factors[k], 3)}</td></tr>`,
+        ),
+      )}${note(p.fit.label)}`,
+    )}${panel(
+      "Venue exposure",
+      table(
+        ["Exposure", "Games", "Share"],
+        Object.entries(r.schedule.groups).map(
+          ([k, n]) =>
+            `<tr><td>${esc(k)}</td><td>${n}</td><td>${r.schedule.games ? pct(n / r.schedule.games) : "Unavailable"}</td></tr>`,
+        ),
+      ) +
+        `<details><summary>All venues</summary>${table(
+          ["Ballpark", "Games", "Share"],
+          r.schedule.venues.map(
+            (x) => `<tr><td>${esc(x.name)}</td><td>${x.games}</td><td>${pct(x.weight)}</td></tr>`,
+          ),
+        )}</details>`,
+    )}</div>${panel(
+      "How the grade is built",
+      `<p>65% current rating preference score (${fmt(p.rating_component, 2)}) + 35% conservative MLB rate score (${fmt(p.stat_component, 2)}) + park adjustment (${fmt(p.fit.adjustment, 3)}), bounded from 1 to 10.</p><p>Current weights: ${Object.entries(
+        p.grade_weights,
+      )
+        .map(
+          ([k, v]) =>
+            esc(k) + " " + pct(v / Object.values(p.grade_weights).reduce((a, b) => a + b, 0)),
+        )
+        .join(
+          " · ",
+        )}.</p><small>Grade changes do not alter the statistical forecast. This formula has not been calibrated to future wins.</small>`,
+    )}`;
+  if (S.tab === "Contract")
+    return (
+      panel("Full salary schedule", contractTable(r.contract_schedule)) +
+      `<div class="columns">${panel("Control & promotion ramifications", `<div class="statstrip"><div><small>Service years</small><b>${fmt(r.promotion.service_years)}</b></div><div><small>Total service days</small><b>${fmt(r.promotion.service_days)}</b></div><div><small>Roster options used</small><b>${fmt(r.promotion.options_used)}</b></div></div><p>Arbitration minimum: ${fmt(r.promotion.arb_min)} service years. Free agency minimum: ${fmt(r.promotion.fa_min)}. Signed coverage takes precedence over arbitration review.</p>${r.promotion.notes.map((x) => `<p>${esc(x)}</p>`).join("")}`)}${panel(
+        "Terms & incentives",
+        table(
+          ["Term", "Exported value"],
+          [
+            "no_trade",
+            "opt_out",
+            "retained",
+            "minimum_pa",
+            "minimum_pa_bonus",
+            "minimum_ip",
+            "minimum_ip_bonus",
+            "mvp_bonus",
+            "cyyoung_bonus",
+            "allstar_bonus",
+          ].map(
+            (k) =>
+              `<tr><td>${esc(k.replaceAll("_", " "))}</td><td>${esc(r.contract[k] ?? "Not exported")}</td></tr>`,
+          ),
+        ) +
+          `<details><summary>All contract & roster fields</summary><pre>${esc(JSON.stringify({ contract: r.contract, extension: r.extension, roster: r.roster }, null, 2))}</pre></details>` +
+          note(
+            "Options are conditional. Opt-out and retention codes require game-screen confirmation; scheduled totals are not labeled guaranteed.",
+          ),
+      )}</div>`
+    );
+  return (
+    panel(
+      "Decisions",
+      r.decisions
+        .map(
+          (x) =>
+            `<div class="feeditem"><strong>${esc(x.report.question)}</strong>${badge(x.status)}<p>${esc(x.report.recommendation)}</p></div>`,
+        )
+        .join("") || empty("No saved decisions involving this player."),
+    ) +
+    panel(
+      "Player notes",
+      `<form id="player-note-form"><label>Your note<textarea name="text" required></textarea></label><button>Save player note</button></form>` +
+        r.notes
+          .map(
+            (x) =>
+              `<div class="feeditem"><small>${date(x.game_date)}</small><p>${esc(x.text)}</p></div>`,
+          )
+          .join(""),
+    )
+  );
+}
+function ratingsTable(r) {
+  const rs = {};
+  for (const [k, v] of Object.entries(r.ratings.players_fielding || {}))
+    if (/rating_pos|range|arm|error|turn|framing|ability/.test(k) && !k.includes("experience"))
+      rs[k] = v;
+  const extra = r.player.kind === "bat" ? r.ratings.players_batting : r.ratings.players_pitching;
+  for (const [k, v] of Object.entries(extra || {}))
+    if (
+      (k.startsWith("running_") ||
+        k.startsWith("pitching_ratings_pitches_") ||
+        k === "pitching_ratings_misc_stamina") &&
+      !k.includes("talent") &&
+      v
+    )
+      rs[k] = v;
+  return (
+    table(
+      ["Exported skill", "Current"],
+      Object.entries(rs).map(
+        ([k, v]) =>
+          `<tr><td class="wrap">${esc(k.replace("pitching_ratings_pitches_", "Pitch: ").replace("fielding_", "").replace("running_ratings_", "Running: ").replaceAll("_", " "))}</td><td>${fmt(v)}</td></tr>`,
+      ),
+    ) +
+    note(
+      "Named ratings are shown as exported. Raw experience/propensity codes are not displayed as 1–10 skills.",
+    )
+  );
+}
+async function saveAction(b) {
+  if (S.snapshot) throw Error("Switch to the latest export before saving.");
+  await api("/api/office/save", {}, b);
+  S.office = await api("/api/office");
+}
+async function lockForm(pid) {
+  const ps = (await api("/api/office/players", { scope: "organization", limit: 500 })).players,
+    dlg = $("#player-dialog");
+  if (!dlg.open) dlg.showModal();
+  $("#player-content").innerHTML =
+    `<div class="reportbody"><h1>Lock a player in place.</h1><p>Suggestions respect this until you approve removing it.</p><form id="lock-form"><div class="formgrid"><label>Player<select name="player_id">${ps.map((p) => `<option value="${p.id}" ${p.id === pid ? "selected" : ""}>${esc(p.name)}</option>`).join("")}</select></label><label>Type<select name="scope">${options(["roster", "lineup", "rotation", "bullpen", "trade"], "lineup")}</select></label><label>Handedness<select name="hand">${options(["both", "vsr", "vsl"], "both")}</select></label><label>Position<select name="position"><option value="">Player’s position</option>${options(["C", "1B", "2B", "3B", "SS", "LF", "CF", "RF", "DH"], "")}</select></label><label>Batting / rotation slot<input name="slot" type="number" min="0" max="9" value="0"></label><label class="wide">Your reason<textarea name="reason"></textarea></label></div><button class="primary">Save binding lock</button></form></div>`;
+  $("#lock-form").onsubmit = async (e) => {
+    e.preventDefault();
+    try {
+      await saveAction({ action: "lock", ...Object.fromEntries(new FormData(e.target)) });
+      dlg.close();
+      toast("Lock saved.");
+      render();
+    } catch (x) {
+      toast(x.message);
+    }
+  };
+}
+async function watchForm(pid) {
+  const p = (await api("/api/office/player", { id: pid })).player,
+    dlg = $("#player-dialog");
+  if (!dlg.open) dlg.showModal();
+  $("#player-content").innerHTML =
+    `<div class="reportbody"><h1>Watch ${esc(p.name)}.</h1><form id="watch-form"><label>What are we watching?<textarea name="reason"></textarea></label><label>Review point<input name="review" value="Next export"></label><button class="primary">Save to watchlist</button></form></div>`;
+  $("#watch-form").onsubmit = async (e) => {
+    e.preventDefault();
+    try {
+      await saveAction({
+        action: "watch",
+        player_id: pid,
+        ...Object.fromEntries(new FormData(e.target)),
+      });
+      dlg.close();
+      toast("Watchlist saved.");
+      render();
+    } catch (x) {
+      toast(x.message);
+    }
+  };
+}
+function bindPage() {
+  if ($("#blueprint-form")) {
+    $$("input[name=identity]").forEach(
+      (el) =>
+        (el.onchange = () => {
+          el.closest(".identity").querySelector("details").open = el.checked;
+          const primary = $("[name=primary]");
+          if (!primary.value && el.checked) primary.value = el.value;
+          else if (primary.value === el.value && !el.checked)
+            primary.value = $("input[name=identity]:checked")?.value || "";
+        }),
+    );
+  }
+  if ($("#blueprint-form"))
+    $("#blueprint-form").onsubmit = async (e) => {
+      e.preventDefault();
+      const f = new FormData(e.target),
+        ids = f.getAll("identity"),
+        primary = f.get("primary");
+      if (primary && !ids.includes(primary)) {
+        toast("Select the primary identity checkbox first.");
+        return;
+      }
+      const b = {
+        ...S.office.state.blueprint,
+        seasons: { ...S.office.state.blueprint.seasons },
+        skills: {},
+      };
+      for (const y of [
+        S.status.snapshot.season,
+        S.status.snapshot.season + 1,
+        S.status.snapshot.season + 2,
+      ])
+        b.seasons[y] = f.get("season-" + y);
+      for (const k of ["goal", "philosophy", "cadence", "boundaries", "reason", "playing_notes"])
+        b[k] = f.get(k);
+      b.identities = primary ? [primary, ...ids.filter((x) => x !== primary)] : ids;
+      b.style_source = b.identities;
+      b.style_overrides = JSON.parse(e.target.dataset.styleOverrides || "[]");
+      b.skills = Object.fromEntries(S.office.skills.map((x) => [x, f.get("skill-" + x)]));
+      try {
+        await saveAction({ action: "blueprint", blueprint: b });
+        toast("Blueprint saved with game date and reason.");
+        render();
+      } catch (x) {
+        toast(x.message);
+      }
+    };
+  for (const id of ["scope", "kind", "sort"])
+    if ($("#" + id))
+      $("#" + id).onchange = (e) => {
+        F[id] = e.target.value;
+        S.offset = 0;
+        render();
+      };
+  if ($("#player-search"))
+    $("#player-search").onchange = (e) => {
+      F.q = e.target.value;
+      S.offset = 0;
+      render();
+    };
+  if ($("#direction"))
+    $("#direction").onclick = () => {
+      F.direction = F.direction === "desc" ? "asc" : "desc";
+      render();
+    };
+  if ($("#prev"))
+    $("#prev").onclick = () => {
+      S.offset = Math.max(0, S.offset - 12);
+      render();
+    };
+  if ($("#next"))
+    $("#next").onclick = () => {
+      S.offset += 12;
+      render();
+    };
+  if ($("#internal"))
+    $("#internal").onchange = (e) => {
+      S.internal = e.target.checked;
+      render();
+    };
+  if ($("#target-pos"))
+    $("#target-pos").onchange = (e) => {
+      S.position = e.target.value;
+      render();
+    };
+  if ($("#target-type"))
+    $("#target-type").onchange = (e) => {
+      if (e.target.value === "sell")
+        $("#target-list").innerHTML =
+          note("Expiring pieces first. Preserve next year’s core and trade-protected players.") +
+          rows(S.targets.selling, 40);
+      else if (e.target.value === "block")
+        $("#target-list").innerHTML = note(S.targets.trade_block, true);
+      else if (e.target.value === "edges")
+        $("#target-list").innerHTML =
+          note(
+            "Research signals among healthy external players with known scheduled salaries up to $8m. This is a filter, not proof of a market bargain.",
+          ) +
+          S.targets.edges
+            .map((x) =>
+              panel(
+                x.player.name,
+                `<p>${badge(x.status, "gold")} ${salary(x.player)}</p><ul>${x.signals.map((v) => `<li>${esc(v)}</li>`).join("")}</ul>${link(x.player)}`,
+              ),
+            )
+            .join("");
+      else {
+        S.free = e.target.value === "free";
+        render();
+      }
+    };
+  if ($("#benchmark-role"))
+    $("#benchmark-role").onchange = (e) => {
+      S.role = e.target.value;
+      render();
+    };
+  if ($("#benchmark-stat"))
+    $("#benchmark-stat").onchange = (e) => {
+      S.stat = e.target.value;
+      render();
+    };
+  if ($("#guide-search"))
+    $("#guide-search").oninput = (e) =>
+      $$("#definitions [data-term]").forEach(
+        (x) => (x.hidden = !x.dataset.term.includes(e.target.value.toLowerCase())),
+      );
+  if ($("#journal-form"))
+    $("#journal-form").onsubmit = async (e) => {
+      e.preventDefault();
+      try {
+        await api("/api/journal", {}, Object.fromEntries(new FormData(e.target)));
+        toast("Note saved.");
+        render();
+      } catch (x) {
+        toast(x.message);
+      }
+    };
+  if ($("#jev-form"))
+    $("#jev-form").onsubmit = async (e) => {
+      e.preventDefault();
+      const f = new FormData(e.target);
+      try {
+        await api("/api/jev/setup", {}, { key: f.get("key"), remember: f.has("remember") });
+        e.target.reset();
+        await status();
+        toast("Jev connection saved securely.");
+        render();
+      } catch (x) {
+        toast(x.message);
+      }
+    };
+  if ($("#case-type"))
+    $("#case-type").onchange = async (e) => {
+      const r = await api("/api/office/players", {
+        scope: ["Signing", "Trade"].includes(e.target.value) ? "all" : "organization",
+        limit: 500,
+      });
+      $("#case-player").innerHTML =
+        '<option value="">Select a player / need</option>' +
+        r.players
+          .map((p) => `<option value="${p.id}">${esc(p.name)} · ${p.team}</option>`)
+          .join("");
+    };
+  if ($("#case-form"))
+    $("#case-form").onsubmit = async (e) => {
+      e.preventDefault();
+      const f = new FormData(e.target),
+        c = Object.fromEntries(f);
+      c.player_id = Number(c.custom_player || c.player_id);
+      c.override = f.has("override");
+      for (const k of ["send", "receive"])
+        c[k] = c[k]
+          .split(",")
+          .map((x) => x.trim())
+          .filter(Boolean)
+          .map(Number);
+      try {
+        const r = await api("/api/office/evaluate", {}, c);
+        S.currentCase = c;
+        $("#case-report").innerHTML = caseReport(r);
+        $("#save-case").disabled = false;
+      } catch (x) {
+        toast(x.message);
+      }
+    };
+  if ($("#save-case"))
+    $("#save-case").onclick = async () => {
+      try {
+        await saveAction({ action: "decision", case: S.currentCase });
+        toast("Case saved with this export and blueprint.");
+        render();
+      } catch (x) {
+        toast(x.message);
+      }
+    };
+  $$("[data-case-status]").forEach(
+    (el) =>
+      (el.onchange = async (e) => {
+        try {
+          await saveAction({
+            action: "decision-status",
+            id: el.dataset.caseStatus,
+            status: e.target.value,
+          });
+          toast("Status updated.");
+        } catch (x) {
+          toast(x.message);
+        }
+      }),
+  );
+}
+document.addEventListener("click", async (e) => {
+  const t = e.target.closest("button,a");
+  if (!t) return;
+  try {
+    if (t.dataset.player) {
+      e.preventDefault();
+      await openPlayer(Number(t.dataset.player));
+    }
+    if (t.dataset.nav) location.hash = t.dataset.nav;
+    if (t.hasAttribute("data-retry")) render();
+    if (t.dataset.reportTab) {
+      S.tab = t.dataset.reportTab;
+      renderPlayer();
+    }
+    if (t.dataset.hand) {
+      S.hand = t.dataset.hand === "vs right-handers" ? "vsr" : "vsl";
+      render();
+    }
+    if (t.dataset.pipeline) {
+      S.draft = t.dataset.pipeline === "Draft board";
+      S.pipelineOffset = 0;
+      render();
+    }
+    if (t.dataset.league) {
+      S.leagueTab = t.dataset.league;
+      render();
+    }
+    if (t.dataset.guide) {
+      S.guideTab = t.dataset.guide;
+      render();
+    }
+    if (t.dataset.playerLock) await lockForm(Number(t.dataset.playerLock));
+    if (t.hasAttribute("data-lock-open")) await lockForm();
+    if (t.dataset.watch) await watchForm(Number(t.dataset.watch));
+    if (t.dataset.unlock) {
+      await saveAction({ action: "unlock", id: t.dataset.unlock });
+      toast("Lock removed by your approval.");
+      render();
+    }
+    if (t.dataset.unwatch) {
+      await saveAction({ action: "unwatch", id: t.dataset.unwatch });
+      render();
+    }
+    if (t.dataset.checkpoint) {
+      await saveAction({ action: "checkpoint", label: t.dataset.checkpoint });
+      toast("Export labeled " + t.dataset.checkpoint);
+      render();
+    }
+    if (t.dataset.case || t.dataset.noteCase) {
+      const c = S.office.state.decisions.find(
+        (x) => x.id === (t.dataset.case || t.dataset.noteCase),
+      );
+      if ($("#case-report")) $("#case-report").innerHTML = caseReport(c.report);
+      else {
+        const dlg = $("#player-dialog");
+        if (!dlg.open) dlg.showModal();
+        $("#player-content").innerHTML =
+          '<div class="reportbody">' + caseReport(c.report) + "</div>";
+      }
+    }
+    if (t.id === "print-report") window.print();
+    if (t.id === "jev-review") {
+      t.disabled = true;
+      t.textContent = "Jev is reviewing…";
+      try {
+        const r = await api("/api/jev/review", {}, { id: S.report.player.id });
+        $("#jev-result").innerHTML =
+          note(
+            "Jev’s second read complements the evidence above; classification confidence is not baseball success probability.",
+          ) +
+          Object.entries(r.response.answers)
+            .map(
+              ([k, a]) =>
+                `<div class="feeditem"><strong>${esc(k.replaceAll("_", " "))}: ${esc({ regular: "Everyday role", specialist: "Matchup specialist", rotation: "Starting rotation", relief: "Bullpen role", review: "Needs further review", ratings: "Ratings carry more weight", history: "Recorded history carries more weight" }[a.choice] || a.choice)}</strong><small>${pct(a.confidence)} classification confidence${a.confidence < 0.8 ? " · provisional; needs review" : ""} · ${r.cached ? "cached" : "new"} review</small></div>`,
+            )
+            .join("") +
+          `<details><summary>Review details</summary><pre>${esc(JSON.stringify(r, null, 2))}</pre></details>`;
+      } finally {
+        t.disabled = false;
+        t.textContent = "Ask Jev for a second read";
+      }
+    }
+  } catch (x) {
+    toast(x.message);
+  }
+});
+document.addEventListener("submit", async (e) => {
+  if (e.target.id === "player-note-form") {
+    e.preventDefault();
+    try {
+      await api(
+        "/api/journal",
+        {},
+        { text: new FormData(e.target).get("text"), player_id: S.report.player.id },
+      );
+      toast("Player note saved.");
+      await openPlayer(S.report.player.id);
+      S.tab = "Decision history";
+      renderPlayer();
+    } catch (x) {
+      toast(x.message);
+    }
+  }
+});
+$("#close-player").onclick = () => $("#player-dialog").close();
+$("#snapshot-select").onchange = async (e) => {
+  S.snapshot = e.target.value;
+  $("#player-dialog").close();
+  await status();
+  render();
+};
+$("#refresh").onclick = async () => {
+  try {
+    await api("/api/import", {}, {});
+    toast("Checking completed exports. Export from OOTP first if the game changed.");
+    await status();
+  } catch (e) {
+    toast(e.message);
+  }
+};
+window.addEventListener("hashchange", render);
+document.addEventListener("DOMContentLoaded", () =>
+  status()
+    .then(render)
+    .catch((e) => {
+      $("#content").innerHTML = '<div class="error">' + esc(e.message) + "</div>";
+    }),
+);
+setInterval(() => status().catch(() => {}), 15000);
+function teaching() {
+  for (const el of $$("th,.metric label,.skilltitle>span")) {
+    if (el.querySelector(".helpbutton")) continue;
+    const text = el.textContent.trim(),
+      term =
+        S.office?.glossary.find((x) => x.term.toLowerCase() === text.toLowerCase()) ||
+        S.office?.glossary.find(
+          (x) => text.toLowerCase().includes(x.term.toLowerCase()) && x.term.length > 3,
+        );
+    if (term) {
+      const b = document.createElement("button");
+      b.className = "helpbutton";
+      b.textContent = "?";
+      b.type = "button";
+      b.setAttribute("aria-label", "Explain " + term.term);
+      b.title = term.definition;
+      b.dataset.help = term.term;
+      b.onfocus = () => showHelp(term);
+      b.onmouseenter = () => showHelp(term);
+      b.onmouseleave = () => {
+        if (document.activeElement !== b) $("#help-popover").hidden = true;
+      };
+      b.onblur = () => ($("#help-popover").hidden = true);
+      el.append(" ", b);
+    }
+  }
+}
+function showHelp(term) {
+  let p = $("#help-popover");
+  if (!p) {
+    p = document.createElement("aside");
+    p.id = "help-popover";
+    p.setAttribute("role", "status");
+    document.body.append(p);
+  }
+  p.innerHTML = "<strong>" + esc(term.term) + "</strong><p>" + esc(term.definition) + "</p>";
+  p.hidden = false;
+}
+function packagePicker(side) {
+  const el = $(`input[name=${side}]`);
+  if (!el) return;
+  el.type = "hidden";
+  const wrap = document.createElement("div");
+  wrap.className = "packagepicker";
+  wrap.innerHTML = `<input type="search" id="${side}-search" placeholder="Search ${side === "send" ? "our players" : "outside targets"} by name" aria-label="${side === "send" ? "Outgoing" : "Incoming"} player search"><div id="${side}-matches"></div><div id="${side}-chips"></div>`;
+  el.parentElement.append(wrap);
+  let generation = 0;
+  const selected = [];
+  wrap.querySelector("input").oninput = async (e) => {
+    const gen = ++generation,
+      q = e.target.value;
+    if (q.length < 2) {
+      $(`#${side}-matches`).innerHTML = "";
+      return;
+    }
+    try {
+      const r = await api("/api/office/players", {
+        scope: side === "send" ? "organization" : "all",
+        q,
+        limit: 15,
+      });
+      if (gen !== generation) return;
+      $(`#${side}-matches`).innerHTML = r.players
+        .filter((p) => side === "send" || p.organization_id !== S.status.snapshot.team_id)
+        .map(
+          (p) =>
+            `<button type="button" data-package-player="${p.id}">${esc(p.name)} · ${esc(p.team)}</button>`,
+        )
+        .join("");
+      $$(`#${side}-matches button`).forEach(
+        (b) =>
+          (b.onclick = () => {
+            if (!selected.some((p) => p.id === Number(b.dataset.packagePlayer))) {
+              selected.push(r.players.find((p) => p.id === Number(b.dataset.packagePlayer)));
+              draw();
+            }
+            e.target.value = "";
+            $(`#${side}-matches`).innerHTML = "";
+          }),
+      );
+    } catch (x) {
+      toast(x.message);
+    }
+  };
+  function draw() {
+    el.value = selected.map((p) => p.id).join(",");
+    $(`#${side}-chips`).innerHTML = selected
+      .map((p) => `<button type="button" data-package-remove="${p.id}">${esc(p.name)} ×</button>`)
+      .join("");
+    $$(`#${side}-chips button`).forEach(
+      (b) =>
+        (b.onclick = () => {
+          selected.splice(
+            selected.findIndex((p) => p.id === Number(b.dataset.packageRemove)),
+            1,
+          );
+          draw();
+        }),
+    );
+  }
+}
+const originalBind = bindPage;
+bindPage = function () {
+  originalBind();
+  for (const [id, key] of [
+    ["league-year", "leagueYear"],
+    ["bat-metric", "batMetric"],
+    ["pit-metric", "pitMetric"],
+    ["pitch-group", "pitchGroup"],
+  ])
+    if ($("#" + id))
+      $("#" + id).onchange = (e) => {
+        S[key] = e.target.value;
+        render();
+      };
+  for (const side of ["send", "receive"]) packagePicker(side);
+  if ($("#case-player"))
+    $("#case-player").onchange = (e) => {
+      const p = S.labPlayers?.find((p) => p.id === Number(e.target.value));
+      if (p) $("[name=position]", $("#case-form")).value = p.position;
+    };
+  teaching();
+};
+const originalReport = renderPlayer;
+renderPlayer = function () {
+  originalReport();
+  teaching();
+};
+const bindWithBoard = bindPage;
+bindPage = function () {
+  bindWithBoard();
+  if ($("#target-type")) {
+    const el = $("#target-type");
+    el.value = S.targetMode || (S.free ? "free" : "all");
+    drawTargets();
+    el.onchange = (e) => {
+      S.targetMode = e.target.value;
+      S.targetOffset = 0;
+      S.free = e.target.value === "free";
+      render();
+    };
+  }
+  if (S.page === "development") {
+    S.pipelineOffset = S.pipelineOffset || 0;
+    const list = $("#content .twocol>div");
+    const data = S.pipelineData;
+    if (data) drawPipeline(list, data);
+  }
+};
+function drawTargets() {
+  const mode = S.targetMode || "all",
+    r = S.targets,
+    offset = S.targetOffset || 0,
+    list = $("#target-list");
+  if (mode === "block") {
+    list.innerHTML = note(r.trade_block, true);
+    return;
+  }
+  let ps = mode === "sell" ? r.selling : mode === "edges" ? r.edges : r.players;
+  const page = ps.slice(offset, offset + 12);
+  list.innerHTML =
+    (mode === "edges"
+      ? note(
+          "Research signals with known salaries up to $8m. Confirm actual acquisition cost; salary alone does not prove an edge.",
+        ) +
+        page
+          .map((x) =>
+            panel(
+              x.player.name,
+              `<p>${badge(x.status, "gold")} ${salary(x.player)}</p><ul>${x.signals.map((v) => `<li>${esc(v)}</li>`).join("")}</ul>${link(x.player)}`,
+            ),
+          )
+          .join("")
+      : rows(page)) +
+    `<div class="pagination"><small>${ps.length} candidates · ${ps.length ? offset + 1 : 0}–${Math.min(offset + 12, ps.length)}</small><div><button data-target-step="-1" ${offset === 0 ? "disabled" : ""}>Previous</button> <button data-target-step="1" ${offset + 12 >= ps.length ? "disabled" : ""}>Next</button></div></div>`;
+}
+function drawPipeline(list, data) {
+  const ps = S.draft ? data.draft : data.prospects,
+    offset = S.pipelineOffset || 0;
+  list.innerHTML =
+    note(data.note) +
+    rows(ps.slice(offset, offset + 12)) +
+    `<div class="pagination"><small>Ranked shortlist: ${ps.length} · More players in Scouting</small><div><button data-pipeline-step="-1" ${offset === 0 ? "disabled" : ""}>Previous</button> <button data-pipeline-step="1" ${offset + 12 >= ps.length ? "disabled" : ""}>Next</button></div></div>`;
+}
+document.addEventListener("click", (e) => {
+  const t = e.target.closest("button");
+  if (t?.dataset.targetStep) {
+    S.targetOffset = Math.max(0, (S.targetOffset || 0) + Number(t.dataset.targetStep) * 12);
+    drawTargets();
+  }
+  if (t?.dataset.pipelineStep) {
+    S.pipelineOffset = Math.max(0, (S.pipelineOffset || 0) + Number(t.dataset.pipelineStep) * 12);
+    drawPipeline($("#content .twocol>div"), S.pipelineData);
+  }
+});
 
-function rosterMovePlan(plan){return panel('Call-ups & corresponding roster moves',(plan.moves.map(m=>`<div class="feeditem"><h3>${m.verdict.startsWith('Do not')?'Review':'Bring up'} ${link(m.up)}${m.down?' / '+(m.verdict.startsWith('Do not')?'assignment review: ':'send out ')+link(m.down.player):' / review roster opening'}</h3>${badge(m.verdict,m.verdict.startsWith('Do not')?'gold':'')}<p>${esc(m.job)} · ${esc(m.role)}. ${esc(m.readiness)}: ${esc(m.reason)}</p>${m.down?`<p><strong>${esc(m.down.route)}</strong> · ${esc(m.down.reason)}</p><p>${esc(m.down.detail)}</p>`:''}<details><summary>Active roster, 40-man, options & development checks</summary>${m.checks.map(n=>`<p>${esc(n)}</p>`).join('')}</details></div>`).join('')||empty('No minor-league call-ups are selected in this roster.'))+(plan.remaining_cuts.length?`<details><summary>Other players outside this proposed roster (${plan.remaining_cuts.length})</summary><p>These are additional assignment reviews, not automatic demotions or DFA recommendations.</p>${plan.remaining_cuts.map(p=>`<p>${link(p)}</p>`).join('')}</details>`:'')+note(plan.note));}
+function rosterMovePlan(plan) {
+  return panel(
+    "Call-ups & corresponding roster moves",
+    (plan.moves
+      .map(
+        (m) =>
+          `<div class="feeditem"><h3>${m.verdict.startsWith("Do not") ? "Review" : "Bring up"} ${link(m.up)}${m.down ? " / " + (m.verdict.startsWith("Do not") ? "assignment review: " : "send out ") + link(m.down.player) : " / review roster opening"}</h3>${badge(m.verdict, m.verdict.startsWith("Do not") ? "gold" : "")}<p>${esc(m.job)} · ${esc(m.role)}. ${esc(m.readiness)}: ${esc(m.reason)}</p>${m.down ? `<p><strong>${esc(m.down.route)}</strong> · ${esc(m.down.reason)}</p><p>${esc(m.down.detail)}</p>` : ""}<details><summary>Active roster, 40-man, options & development checks</summary>${m.checks.map((n) => `<p>${esc(n)}</p>`).join("")}</details></div>`,
+      )
+      .join("") || empty("No minor-league call-ups are selected in this roster.")) +
+      (plan.remaining_cuts.length
+        ? `<details><summary>Other players outside this proposed roster (${plan.remaining_cuts.length})</summary><p>These are additional assignment reviews, not automatic demotions or DFA recommendations.</p>${plan.remaining_cuts.map((p) => `<p>${link(p)}</p>`).join("")}</details>`
+        : "") +
+      note(plan.note),
+  );
+}

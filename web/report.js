@@ -1,13 +1,153 @@
-'use strict';
+"use strict";
 // Preserve the full underlying report; this layer changes its reading order and explanation.
-const detailedPlayerBody=playerBody;
-const roleNames={SP:'Starting pitcher',RP:'Reliever',C:'Catcher','1B':'First base','2B':'Second base','3B':'Third base',SS:'Shortstop',LF:'Left field',CF:'Center field',RF:'Right field',DH:'Designated hitter'};
-function evidenceLine(title,value,explanation){return `<div class="explain-line"><strong>${esc(title)} <span>${esc(value)}</span></strong><p>${esc(explanation)}</p></div>`;}
-function compactComparison(r){const a=r.assessment,alt=a.alternative,p=r.player;if(!alt)return note('No qualified organizational alternative was found for this role. Review another position or outside help.');const q=alt.player;return `<div class="comparison-grid"><article><span class="eyebrow">THE PLAYER YOU’RE REVIEWING</span>${link(p)}<p>${badge(a.readiness,a.readiness==='Ready now'?'green':'gold')} ${p.locks.length?badge('GM locked','gold'):''}</p><p>${esc(a.readiness_reason)}</p><small>${salary(p)} · ${p.end_year?'Through '+p.end_year:'Contract needs review'}</small></article><article><span class="eyebrow">STRONGEST PRACTICAL INTERNAL ALTERNATIVE</span>${link(q)}<p>${badge(alt.readiness,alt.readiness==='Ready now'?'green':'gold')}</p><p>${esc(alt.readiness_reason)}</p><small>${salary(q)} · ${q.active?'Active roster':esc(q.team)}</small></article></div><div class="comparison-facts">${evidenceLine('Offensive / pitching preference',fmt(p.grade,1)+' vs '+fmt(q.grade,1),q.grade>p.grade?'The alternative has the higher overall preference grade; position defense and readiness can still change the choice.':'The reviewed player has the higher or equal overall preference grade; this is a heuristic, not a forecast of wins.')}${evidenceLine(p.kind==='bat'?'Position defense':'Stamina',fmt(r.assessment.subject_defense)+' vs '+fmt(alt.defense),p.kind==='bat'?'Exported ability at the intended position. The best bat does not automatically make the best defensive choice.':'Workload capacity needs to be evaluated separately from pitcher rate quality.')}</div>${alt.costs.map(x=>note(x,true)).join('')}<details class="more-alternatives"><summary>See more organizational alternatives (${a.alternatives.length})</summary>${a.alternatives.map(x=>`<div class="alternate-row"><div>${link(x.player)} ${badge(x.readiness,x.readiness==='Ready now'?'green':'gold')}<small>${esc(x.player.team)} · ${salary(x.player)}</small></div><p>${esc(x.readiness_reason)}</p>${x.costs.map(c=>`<small>${esc(c)}</small>`).join('')}</div>`).join('')}</details>`;}
-function positionContextControls(r){const p=r.player,a=r.assessment,vs=p.kind==='pit'?['SP','RP']:['C','1B','2B','3B','SS','LF','CF','RF','DH'];return `<div class="intended-controls"><label>Where we intend to use him<select id="report-position">${vs.map(pos=>`<option value="${pos}" ${a.intended_position===pos?'selected':''}>${pos} · ${esc(roleNames[pos])}</option>`).join('')}</select></label><div><small>The department’s positional preference</small><strong>${esc(roleNames[a.best_fit])}</strong><small>${a.best_fit===a.intended_position?'Intended use and positional preference agree.':'A different fit is worth discussing before moving him.'}</small></div></div>`;}
-function assessmentOverview(r){const p=r.player,a=r.assessment;return `<article class="report-verdict"><div class="verdict-heading"><h2>${esc(a.verdict)}</h2><button class="quiet-grade" data-report-tab="Team fit" title="${esc(a.grade_note)}"><strong>${fmt(p.grade,1)}</strong><span>/10 · department fit ⓘ</span></button></div>${a.paragraphs.map(x=>`<p>${esc(x)}</p>`).join('')}</article>${positionContextControls(r)}<section class="role-recommendation"><span class="eyebrow">RECOMMENDED ROLE</span><h2>${esc(a.role)}</h2><p class="role-conclusion">${esc(a.recommendation)}</p>${pitchingUsageSummary(r)}${!a.qualified?note('Position qualification is below the department’s current threshold. This comparison does not establish readiness to play here.',true):''}${a.locked?note('The comparison respects your standing lock. Any change requires your approval.',true):''}${compactComparison(r)}</section><div class="scouting-reading"><article><h3>Current ability</h3><p>${esc(a.current)}</p><button data-report-tab="Skills">See the skill comparisons</button></article><article><h3>Future upside</h3><p>${esc(a.future)}</p><button data-report-tab="Skills">Review the development evidence</button></article><article><h3>Fit for our club</h3><p>${esc(a.fit)}</p><button data-report-tab="Team fit">Explore the park and position fit</button></article></div><details class="supporting-evidence"><summary>The supporting evidence — stats, forecast and uncertainty</summary>${r.why.filter(x=>!x.includes('engine current value')).map(x=>`<p>${esc(x)}</p>`).join('')}${evidenceLine(p.kind==='bat'?'Forecast OPS':'Forecast FIP',p.kind==='bat'?rate(r.projection.ops):fmt(r.projection.fip,2),p.kind==='bat'?'A conservative estimate of combined on-base and extra-base production, informed by completed MLB history and the league baseline. It does not include fielding or baserunning.':'An estimate of strikeout, walk, hit-batter and home-run performance, using a league constant. It does not explain every part of run prevention.')}${r.interval?note('Pooled historical forecast-error band: '+fmt(r.interval.low,p.kind==='bat'?3:2)+'–'+fmt(r.interval.high,p.kind==='bat'?3:2)+'. This is not a player-specific guarantee.'):note('The evidence is too limited to provide a personalized performance range.')}</details><div class="report-actions"><button data-player-lock="${p.id}">Lock this player</button><button data-watch="${p.id}">Add to watchlist</button><button id="jev-review">Ask Jev for a second read</button><button id="print-report">Print</button></div><div id="jev-result"></div>`;}
-function explainedSkills(r){const a=r.assessment;return positionContextControls(r)+`<p class="section-intro">Compare him first with ${r.player.kind==='bat'?'regular starters at '+esc(a.intended_position):a.intended_position==='SP'?'MLB starters':'MLB relievers'}, then with all MLB ${r.player.kind==='bat'?'hitters':'pitchers'}. These are current rating comparisons, not statistical leaderboards.</p><div class="explained-skills">${a.skills.map(x=>{const original=r.skills.find(s=>s.key===x.key);return `<article class="explained-skill"><header><h3>${esc(x.label)}</h3><span>${fmt(x.value)}/10 <small>current · ${fmt(original?.potential)}/10 potential</small></span></header><p class="skill-interpretation">${esc(x.explanation)}</p><div class="benchmark-pair"><div><small>${esc(x.position_label)}</small><strong>${esc(x.position_detail)}</strong><small>${x.position.lower}% below · ${x.position.tied}% tied · ${x.position.higher}% above</small></div><div><small>All MLB ${r.player.kind==='bat'?'hitters':'pitchers'}</small><strong>${esc(x.league_detail)}</strong><small>${x.league.lower}% below · ${x.league.tied}% tied · ${x.league.higher}% above</small></div></div><details><summary>Platoon ratings & comparison method</summary><p>vs R ${fmt(original?.vsr)}/10; vs L ${fmt(original?.vsl)}/10. These describe the named current OOTP ratings, not a guaranteed statistical split.</p><p>${esc(x.method)}</p><p>Tied ratings receive a rank range; the midpoint percentile places half the tied group below. Small groups and inferred roles reduce certainty.</p></details></article>`;}).join('')}</div>${panel('Defense, running & repertoire',ratingsTable(r))}${panel('Rating history',r.rating_history.length>1?table(['Export date',...r.skills.map(x=>x.label)],r.rating_history.map(x=>`<tr><td>${date(x.game_date)}</td>${r.skills.map(k=>`<td>${fmt(x.ratings[k.label])}</td>`).join('')}</tr>`)):empty('The first capture establishes a baseline. Later exports build the rating history.'))}`;}
-playerBody=function(r){if(!r.assessment)return detailedPlayerBody(r);if(S.tab==='Overview')return assessmentOverview(r);if(S.tab==='Skills')return explainedSkills(r);return detailedPlayerBody(r);};
-renderPlayer=function(){const r=S.report,p=r.player;$('#player-content').innerHTML=`<header class="playerhero"><span class="avatar">${esc(p.name.split(' ').map(x=>x[0]).slice(0,2).join(''))}</span><div><span class="eyebrow">${esc(p.team)} · ${p.position} · AGE ${p.age} · ${esc(p.bats)}/${esc(p.throws)}</span><h1>${esc(p.name)}</h1>${badge(p.injured||p.on_dl?'Injury review':p.active?'Active roster':'Organizational / outside option',p.injured?'red':'green')} ${p.locks.length?badge('GM locked','gold'):''}<small> Player ID ${p.id}</small></div><div class="contractmini"><div class="big">${salary(p)}</div><small>${p.end_year?'Through '+p.end_year+' · '+p.years_left+' seasons including current':'Contract needs review'}</small><small>${cash(p.scheduled_total)} remaining scheduled</small></div></header><div class="reporttabs">${tabs(['Overview','Skills','Performance','Team fit','Contract','Decision history'],S.tab,'data-report-tab')}</div><section class="reportbody">${playerBody(r)}</section>`;teaching();const selector=$('#report-position');if(selector)selector.onchange=async e=>{const position=e.target.value,tab=S.tab;selector.disabled=true;try{S.report=await api('/api/office/player',{id:p.id,position});S.tab=tab;renderPlayer();}catch(error){toast(error.message);selector.disabled=false;}};};
-const exportedRatingsTable=ratingsTable;
-ratingsTable=function(r){const positions={1:'Pitcher',2:'Catcher',3:'First base',4:'Second base',5:'Third base',6:'Shortstop',7:'Left field',8:'Center field',9:'Right field'},rows=[],f=r.ratings.players_fielding||{};for(const [key,value] of Object.entries(f)){if(key.includes('experience')||key.endsWith('_pot'))continue;const match=key.match(/^fielding_rating_pos(\d+)$/);if(match){if(Number(value)>0)rows.push([positions[match[1]]+' defense',value]);continue;}if(/range|arm|error|turn|framing|ability/.test(key)){let label=key.replace(/^fielding_ratings_/,'').replaceAll('_',' ');label=label.replace('error','error avoidance').replace('turn doubleplay','double-play turning');rows.push([label[0].toUpperCase()+label.slice(1),value]);}}const extra=r.player.kind==='bat'?r.ratings.players_batting:r.ratings.players_pitching;for(const [key,value] of Object.entries(extra||{})){if(key.includes('talent')||!value)continue;let label;if(key.startsWith('running_ratings_'))label=key.replace('running_ratings_','Running: ').replaceAll('_',' ');else if(key.startsWith('pitching_ratings_pitches_'))label=key.replace('pitching_ratings_pitches_','Pitch: ').replaceAll('_',' ');else if(key==='pitching_ratings_misc_stamina')label='Stamina';if(label)rows.push([label,value]);}return table(['Ability','Current rating'],rows.map(([label,value])=>`<tr><td>${esc(label)}</td><td>${fmt(value)}/10</td></tr>`))+`<details><summary>All exported fielding and repertoire fields</summary>${exportedRatingsTable(r)}</details>`;};
+const detailedPlayerBody = playerBody;
+const roleNames = {
+  SP: "Starting pitcher",
+  RP: "Reliever",
+  C: "Catcher",
+  "1B": "First base",
+  "2B": "Second base",
+  "3B": "Third base",
+  SS: "Shortstop",
+  LF: "Left field",
+  CF: "Center field",
+  RF: "Right field",
+  DH: "Designated hitter",
+};
+function evidenceLine(title, value, explanation) {
+  return `<div class="explain-line"><strong>${esc(title)} <span>${esc(value)}</span></strong><p>${esc(explanation)}</p></div>`;
+}
+function compactComparison(r) {
+  const a = r.assessment,
+    alt = a.alternative,
+    p = r.player;
+  if (!alt)
+    return note(
+      "No qualified organizational alternative was found for this role. Review another position or outside help.",
+    );
+  const q = alt.player;
+  return `<div class="comparison-grid"><article><span class="eyebrow">THE PLAYER YOU’RE REVIEWING</span>${link(p)}<p>${badge(a.readiness, a.readiness === "Ready now" ? "green" : "gold")} ${p.locks.length ? badge("GM locked", "gold") : ""}</p><p>${esc(a.readiness_reason)}</p><small>${salary(p)} · ${p.end_year ? "Through " + p.end_year : "Contract needs review"}</small></article><article><span class="eyebrow">STRONGEST PRACTICAL INTERNAL ALTERNATIVE</span>${link(q)}<p>${badge(alt.readiness, alt.readiness === "Ready now" ? "green" : "gold")}</p><p>${esc(alt.readiness_reason)}</p><small>${salary(q)} · ${q.active ? "Active roster" : esc(q.team)}</small></article></div><div class="comparison-facts">${evidenceLine("Offensive / pitching preference", fmt(p.grade, 1) + " vs " + fmt(q.grade, 1), q.grade > p.grade ? "The alternative has the higher overall preference grade; position defense and readiness can still change the choice." : "The reviewed player has the higher or equal overall preference grade; this is a heuristic, not a forecast of wins.")}${evidenceLine(p.kind === "bat" ? "Position defense" : "Stamina", fmt(r.assessment.subject_defense) + " vs " + fmt(alt.defense), p.kind === "bat" ? "Exported ability at the intended position. The best bat does not automatically make the best defensive choice." : "Workload capacity needs to be evaluated separately from pitcher rate quality.")}</div>${alt.costs.map((x) => note(x, true)).join("")}<details class="more-alternatives"><summary>See more organizational alternatives (${a.alternatives.length})</summary>${a.alternatives.map((x) => `<div class="alternate-row"><div>${link(x.player)} ${badge(x.readiness, x.readiness === "Ready now" ? "green" : "gold")}<small>${esc(x.player.team)} · ${salary(x.player)}</small></div><p>${esc(x.readiness_reason)}</p>${x.costs.map((c) => `<small>${esc(c)}</small>`).join("")}</div>`).join("")}</details>`;
+}
+function positionContextControls(r) {
+  const p = r.player,
+    a = r.assessment,
+    vs = p.kind === "pit" ? ["SP", "RP"] : ["C", "1B", "2B", "3B", "SS", "LF", "CF", "RF", "DH"];
+  return `<div class="intended-controls"><label>Where we intend to use him<select id="report-position">${vs.map((pos) => `<option value="${pos}" ${a.intended_position === pos ? "selected" : ""}>${pos} · ${esc(roleNames[pos])}</option>`).join("")}</select></label><div><small>The department’s positional preference</small><strong>${esc(roleNames[a.best_fit])}</strong><small>${a.best_fit === a.intended_position ? "Intended use and positional preference agree." : "A different fit is worth discussing before moving him."}</small></div></div>`;
+}
+function assessmentOverview(r) {
+  const p = r.player,
+    a = r.assessment;
+  return `<article class="report-verdict"><div class="verdict-heading"><h2>${esc(a.verdict)}</h2><button class="quiet-grade" data-report-tab="Team fit" title="${esc(a.grade_note)}"><strong>${fmt(p.grade, 1)}</strong><span>/10 · department fit ⓘ</span></button></div>${a.paragraphs.map((x) => `<p>${esc(x)}</p>`).join("")}</article>${positionContextControls(r)}<section class="role-recommendation"><span class="eyebrow">RECOMMENDED ROLE</span><h2>${esc(a.role)}</h2><p class="role-conclusion">${esc(a.recommendation)}</p>${pitchingUsageSummary(r)}${!a.qualified ? note("Position qualification is below the department’s current threshold. This comparison does not establish readiness to play here.", true) : ""}${a.locked ? note("The comparison respects your standing lock. Any change requires your approval.", true) : ""}${compactComparison(r)}</section><div class="scouting-reading"><article><h3>Current ability</h3><p>${esc(a.current)}</p><button data-report-tab="Skills">See the skill comparisons</button></article><article><h3>Future upside</h3><p>${esc(a.future)}</p><button data-report-tab="Skills">Review the development evidence</button></article><article><h3>Fit for our club</h3><p>${esc(a.fit)}</p><button data-report-tab="Team fit">Explore the park and position fit</button></article></div><details class="supporting-evidence"><summary>The supporting evidence — stats, forecast and uncertainty</summary>${r.why
+    .filter((x) => !x.includes("engine current value"))
+    .map((x) => `<p>${esc(x)}</p>`)
+    .join(
+      "",
+    )}${evidenceLine(p.kind === "bat" ? "Forecast OPS" : "Forecast FIP", p.kind === "bat" ? rate(r.projection.ops) : fmt(r.projection.fip, 2), p.kind === "bat" ? "A conservative estimate of combined on-base and extra-base production, informed by completed MLB history and the league baseline. It does not include fielding or baserunning." : "An estimate of strikeout, walk, hit-batter and home-run performance, using a league constant. It does not explain every part of run prevention.")}${r.interval ? note("Pooled historical forecast-error band: " + fmt(r.interval.low, p.kind === "bat" ? 3 : 2) + "–" + fmt(r.interval.high, p.kind === "bat" ? 3 : 2) + ". This is not a player-specific guarantee.") : note("The evidence is too limited to provide a personalized performance range.")}</details><div class="report-actions"><button data-player-lock="${p.id}">Lock this player</button><button data-watch="${p.id}">Add to watchlist</button><button id="jev-review">Ask Jev for a second read</button><button id="print-report">Print</button></div><div id="jev-result"></div>`;
+}
+function explainedSkills(r) {
+  const a = r.assessment;
+  return (
+    positionContextControls(r) +
+    `<p class="section-intro">Compare him first with ${r.player.kind === "bat" ? "regular starters at " + esc(a.intended_position) : a.intended_position === "SP" ? "MLB starters" : "MLB relievers"}, then with all MLB ${r.player.kind === "bat" ? "hitters" : "pitchers"}. These are current rating comparisons, not statistical leaderboards.</p><div class="explained-skills">${a.skills
+      .map((x) => {
+        const original = r.skills.find((s) => s.key === x.key);
+        return `<article class="explained-skill"><header><h3>${esc(x.label)}</h3><span>${fmt(x.value)}/10 <small>current · ${fmt(original?.potential)}/10 potential</small></span></header><p class="skill-interpretation">${esc(x.explanation)}</p><div class="benchmark-pair"><div><small>${esc(x.position_label)}</small><strong>${esc(x.position_detail)}</strong><small>${x.position.lower}% below · ${x.position.tied}% tied · ${x.position.higher}% above</small></div><div><small>All MLB ${r.player.kind === "bat" ? "hitters" : "pitchers"}</small><strong>${esc(x.league_detail)}</strong><small>${x.league.lower}% below · ${x.league.tied}% tied · ${x.league.higher}% above</small></div></div><details><summary>Platoon ratings & comparison method</summary><p>vs R ${fmt(original?.vsr)}/10; vs L ${fmt(original?.vsl)}/10. These describe the named current OOTP ratings, not a guaranteed statistical split.</p><p>${esc(x.method)}</p><p>Tied ratings receive a rank range; the midpoint percentile places half the tied group below. Small groups and inferred roles reduce certainty.</p></details></article>`;
+      })
+      .join("")}</div>${panel("Defense, running & repertoire", ratingsTable(r))}${panel(
+      "Rating history",
+      r.rating_history.length > 1
+        ? table(
+            ["Export date", ...r.skills.map((x) => x.label)],
+            r.rating_history.map(
+              (x) =>
+                `<tr><td>${date(x.game_date)}</td>${r.skills.map((k) => `<td>${fmt(x.ratings[k.label])}</td>`).join("")}</tr>`,
+            ),
+          )
+        : empty(
+            "The first capture establishes a baseline. Later exports build the rating history.",
+          ),
+    )}`
+  );
+}
+playerBody = function (r) {
+  if (!r.assessment) return detailedPlayerBody(r);
+  if (S.tab === "Overview") return assessmentOverview(r);
+  if (S.tab === "Skills") return explainedSkills(r);
+  return detailedPlayerBody(r);
+};
+renderPlayer = function () {
+  const r = S.report,
+    p = r.player;
+  $("#player-content").innerHTML = `<header class="playerhero"><span class="avatar">${esc(
+    p.name
+      .split(" ")
+      .map((x) => x[0])
+      .slice(0, 2)
+      .join(""),
+  )}</span><div><span class="eyebrow">${esc(p.team)} · ${p.position} · AGE ${p.age} · ${esc(p.bats)}/${esc(p.throws)}</span><h1>${esc(p.name)}</h1>${badge(p.injured || p.on_dl ? "Injury review" : p.active ? "Active roster" : "Organizational / outside option", p.injured ? "red" : "green")} ${p.locks.length ? badge("GM locked", "gold") : ""}<small> Player ID ${p.id}</small></div><div class="contractmini"><div class="big">${salary(p)}</div><small>${p.end_year ? "Through " + p.end_year + " · " + p.years_left + " seasons including current" : "Contract needs review"}</small><small>${cash(p.scheduled_total)} remaining scheduled</small></div></header><div class="reporttabs">${tabs(["Overview", "Skills", "Performance", "Team fit", "Contract", "Decision history"], S.tab, "data-report-tab")}</div><section class="reportbody">${playerBody(r)}</section>`;
+  teaching();
+  const selector = $("#report-position");
+  if (selector)
+    selector.onchange = async (e) => {
+      const position = e.target.value,
+        tab = S.tab;
+      selector.disabled = true;
+      try {
+        S.report = await api("/api/office/player", { id: p.id, position });
+        S.tab = tab;
+        renderPlayer();
+      } catch (error) {
+        toast(error.message);
+        selector.disabled = false;
+      }
+    };
+};
+const exportedRatingsTable = ratingsTable;
+ratingsTable = function (r) {
+  const positions = {
+      1: "Pitcher",
+      2: "Catcher",
+      3: "First base",
+      4: "Second base",
+      5: "Third base",
+      6: "Shortstop",
+      7: "Left field",
+      8: "Center field",
+      9: "Right field",
+    },
+    rows = [],
+    f = r.ratings.players_fielding || {};
+  for (const [key, value] of Object.entries(f)) {
+    if (key.includes("experience") || key.endsWith("_pot")) continue;
+    const match = key.match(/^fielding_rating_pos(\d+)$/);
+    if (match) {
+      if (Number(value) > 0) rows.push([positions[match[1]] + " defense", value]);
+      continue;
+    }
+    if (/range|arm|error|turn|framing|ability/.test(key)) {
+      let label = key.replace(/^fielding_ratings_/, "").replaceAll("_", " ");
+      label = label
+        .replace("error", "error avoidance")
+        .replace("turn doubleplay", "double-play turning");
+      rows.push([label[0].toUpperCase() + label.slice(1), value]);
+    }
+  }
+  const extra = r.player.kind === "bat" ? r.ratings.players_batting : r.ratings.players_pitching;
+  for (const [key, value] of Object.entries(extra || {})) {
+    if (key.includes("talent") || !value) continue;
+    let label;
+    if (key.startsWith("running_ratings_"))
+      label = key.replace("running_ratings_", "Running: ").replaceAll("_", " ");
+    else if (key.startsWith("pitching_ratings_pitches_"))
+      label = key.replace("pitching_ratings_pitches_", "Pitch: ").replaceAll("_", " ");
+    else if (key === "pitching_ratings_misc_stamina") label = "Stamina";
+    if (label) rows.push([label, value]);
+  }
+  return (
+    table(
+      ["Ability", "Current rating"],
+      rows.map(([label, value]) => `<tr><td>${esc(label)}</td><td>${fmt(value)}/10</td></tr>`),
+    ) +
+    `<details><summary>All exported fielding and repertoire fields</summary>${exportedRatingsTable(r)}</details>`
+  );
+};

@@ -1,10 +1,111 @@
-'use strict';
-let ownerYear=null;
-function ownerHome(){const y=String(S.status.snapshot.season),s=S.office.state.owner_goals?.[y];return panel((S.office.state.owner_goals?.[String(S.status.snapshot.season)]?.owner||'Owner')+' priorities',s?.goals?.length?`<ul>${s.goals.map(g=>`<li>${esc(g.title)}</li>`).join('')}</ul><button data-nav="owner">Review owner goals →</button>`:'<p>Record the owner’s annual goals and progress.</p><button data-nav="owner">Add owner goals →</button>');}
-function ownerContextPanel(c){return c?.goals?.length?panel('How this serves the owner',c.goals.map(g=>`<details><summary>${esc(g.title)}</summary><p>${esc(g.detail)}</p></details>`).join('')+`<small>${esc(c.note)}</small>`):'';}
-async function owner(){const r=await api('/api/office/owner-goals',{year:ownerYear||S.status.snapshot.season});S.ownerBoard=r;const s=r.season,e=r.evidence;return head('The owner’s expectations. Our baseball decisions.','Save each season’s goals, track the evidence and explain the tradeoffs.','OWNER GOALS')+`<div class="filters"><strong>${r.year}</strong>${r.years.map(y=>`<button data-owner-year="${y}">${esc(y)}</button>`).join('')}<button data-owner-year="${S.status.snapshot.season+1}">Set up next season</button></div>${s.goals?.length?`<div class="direction-grid">${s.goals.map(g=>panel(g.title,`${badge(g.status,g.status==='At risk'?'gold':'')}<small>Due ${g.due_year}${g.position?' · '+esc(g.position):''}</small><p>${esc(r.context?.goals.find(x=>x.title===g.title)?.detail||'Review the owner’s check-in and record progress below.')}</p>${g.notes?`<p><strong>Progress note:</strong> ${esc(g.notes)}</p>`:''}`)).join('')}</div>`:empty('No owner goals saved for this season. Enter them below.')}<div class="columns">${panel('Evidence we can measure',e.fan_interest!=null?`<h3>Fan interest: ${fmt(e.fan_interest)}</h3><p>${e.fan_change==null?'Capture a starting baseline when saving this season’s goals.':`${e.fan_change>0?'+':''}${fmt(e.fan_change)} since the captured baseline of ${fmt(e.baseline_fan_interest)} on ${date(e.baseline_date)}.`}</p>${e.baseline_2b?`<p>Starting 2B baseline: ${link(e.baseline_2b)} · department grade ${fmt(e.baseline_2b.grade,1)}/10. This is an inferred assignment; the owner may judge the upgrade differently.</p>`:''}<small>${esc(e.note)}</small>`:'<p>Season archived or no measurable baseline available.</p>')}${panel('Update the season',`<details><summary>Edit goals and record progress</summary><form id="owner-form"><div class="formgrid"><label>Season<input name="year" type="number" min="1800" max="3000" value="${r.year}"></label><label>Owner<input name="owner" value="${esc(s.owner||'')}"></label></div><div id="owner-edit-rows">${(s.goals||[]).map(g=>ownerEditRow(g,r)).join('')}</div><button type="button" id="owner-add">Add a goal</button><details><summary>Owner’s original letter</summary><textarea name="letter" rows="8">${esc(s.letter||'')}</textarea></details><p><small>Status is your recorded assessment. Only mark complete after confirmation in OOTP.</small></p><button class="primary">Save owner goals & progress</button><p id="owner-error" class="formerror" hidden></p></form></details>`)} </div>${panel('Check-in history',S.office.state.owner_goal_history?.filter(h=>h.year===r.year).map(h=>`<details><summary>${date(h.game_date)} · ${new Date(h.created_at).toLocaleString()}</summary>${h.after.goals.map(g=>`<p><strong>${esc(g.title)}</strong> · ${esc(g.status)}${g.notes?' — '+esc(g.notes):''}</p>`).join('')}</details>`).join('')||empty('Save progress after each owner check-in to build the archive.'))}`;}
-function ownerEditRow(g,r){return `<fieldset class="owner-edit-row" data-goal-id="${esc(g.id||'')}"><legend>${esc(g.title||'New goal')}</legend><label>Goal<input data-goal-field="title" required maxlength="1000" value="${esc(g.title||'')}"></label><div class="formgrid"><label>Category<select data-goal-field="category">${options(r.categories,g.category||'Other')}</select></label><label>Due season<input data-goal-field="due_year" type="number" value="${g.due_year||r.year}"></label><label>Position<select data-goal-field="position">${options(['','C','1B','2B','3B','SS','LF','CF','RF','DH','SP','RP','P'],g.position||'')}</select></label><label>Progress<select data-goal-field="status">${options(r.statuses,g.status||'Not assessed')}</select></label></div><label>Progress / owner feedback<textarea data-goal-field="notes" rows="2">${esc(g.notes||'')}</textarea></label><button type="button" data-owner-remove>Remove goal</button></fieldset>`;}
-document.addEventListener('click',e=>{const year=e.target.closest('[data-owner-year]');if(year){ownerYear=Number(year.dataset.ownerYear);render();return;}if(e.target.closest('#owner-add'))$('#owner-edit-rows').insertAdjacentHTML('beforeend',ownerEditRow({id:crypto.randomUUID()},S.ownerBoard));if(e.target.closest('[data-owner-remove]'))e.target.closest('.owner-edit-row').remove();});
-document.addEventListener('submit',async e=>{if(e.target.id!=='owner-form')return;e.preventDefault();const form=e.target,f=new FormData(form),error=$('#owner-error'),goals=Array.from(form.querySelectorAll('.owner-edit-row')).map(row=>{const g={id:row.dataset.goalId};row.querySelectorAll('[data-goal-field]').forEach(el=>g[el.dataset.goalField]=el.value);return g;}),button=form.querySelector('.primary');button.disabled=true;error.hidden=true;try{await api('/api/office/save',{}, {action:'owner-goals',year:Number(f.get('year')),owner:f.get('owner'),letter:f.get('letter'),goals});ownerYear=Number(f.get('year'));toast('Owner goals and progress saved.');render();}catch(ex){error.textContent=ex.message;error.hidden=false;}finally{button.disabled=false;}});
-const ownerAcquisitionBase=acquisition;
-acquisition=async function(){const html=await ownerAcquisitionBase();return html.replace('<div class="filters">',ownerContextPanel(S.targets?.owner_goals)+'<div class="filters">');};
+"use strict";
+let ownerYear = null;
+function ownerHome() {
+  const y = String(S.status.snapshot.season),
+    s = S.office.state.owner_goals?.[y];
+  return panel(
+    (S.office.state.owner_goals?.[String(S.status.snapshot.season)]?.owner || "Owner") +
+      " priorities",
+    s?.goals?.length
+      ? `<ul>${s.goals.map((g) => `<li>${esc(g.title)}</li>`).join("")}</ul><button data-nav="owner">Review owner goals →</button>`
+      : '<p>Record the owner’s annual goals and progress.</p><button data-nav="owner">Add owner goals →</button>',
+  );
+}
+function ownerContextPanel(c) {
+  return c?.goals?.length
+    ? panel(
+        "How this serves the owner",
+        c.goals
+          .map(
+            (g) => `<details><summary>${esc(g.title)}</summary><p>${esc(g.detail)}</p></details>`,
+          )
+          .join("") + `<small>${esc(c.note)}</small>`,
+      )
+    : "";
+}
+async function owner() {
+  const r = await api("/api/office/owner-goals", { year: ownerYear || S.status.snapshot.season });
+  S.ownerBoard = r;
+  const s = r.season,
+    e = r.evidence;
+  return (
+    head(
+      "The owner’s expectations. Our baseball decisions.",
+      "Save each season’s goals, track the evidence and explain the tradeoffs.",
+      "OWNER GOALS",
+    ) +
+    `<div class="filters"><strong>${r.year}</strong>${r.years.map((y) => `<button data-owner-year="${y}">${esc(y)}</button>`).join("")}<button data-owner-year="${S.status.snapshot.season + 1}">Set up next season</button></div>${s.goals?.length ? `<div class="direction-grid">${s.goals.map((g) => panel(g.title, `${badge(g.status, g.status === "At risk" ? "gold" : "")}<small>Due ${g.due_year}${g.position ? " · " + esc(g.position) : ""}</small><p>${esc(r.context?.goals.find((x) => x.title === g.title)?.detail || "Review the owner’s check-in and record progress below.")}</p>${g.notes ? `<p><strong>Progress note:</strong> ${esc(g.notes)}</p>` : ""}`)).join("")}</div>` : empty("No owner goals saved for this season. Enter them below.")}<div class="columns">${panel("Evidence we can measure", e.fan_interest != null ? `<h3>Fan interest: ${fmt(e.fan_interest)}</h3><p>${e.fan_change == null ? "Capture a starting baseline when saving this season’s goals." : `${e.fan_change > 0 ? "+" : ""}${fmt(e.fan_change)} since the captured baseline of ${fmt(e.baseline_fan_interest)} on ${date(e.baseline_date)}.`}</p>${e.baseline_2b ? `<p>Starting 2B baseline: ${link(e.baseline_2b)} · department grade ${fmt(e.baseline_2b.grade, 1)}/10. This is an inferred assignment; the owner may judge the upgrade differently.</p>` : ""}<small>${esc(e.note)}</small>` : "<p>Season archived or no measurable baseline available.</p>")}${panel("Update the season", `<details><summary>Edit goals and record progress</summary><form id="owner-form"><div class="formgrid"><label>Season<input name="year" type="number" min="1800" max="3000" value="${r.year}"></label><label>Owner<input name="owner" value="${esc(s.owner || "")}"></label></div><div id="owner-edit-rows">${(s.goals || []).map((g) => ownerEditRow(g, r)).join("")}</div><button type="button" id="owner-add">Add a goal</button><details><summary>Owner’s original letter</summary><textarea name="letter" rows="8">${esc(s.letter || "")}</textarea></details><p><small>Status is your recorded assessment. Only mark complete after confirmation in OOTP.</small></p><button class="primary">Save owner goals & progress</button><p id="owner-error" class="formerror" hidden></p></form></details>`)} </div>${panel(
+      "Check-in history",
+      S.office.state.owner_goal_history
+        ?.filter((h) => h.year === r.year)
+        .map(
+          (h) =>
+            `<details><summary>${date(h.game_date)} · ${new Date(h.created_at).toLocaleString()}</summary>${h.after.goals.map((g) => `<p><strong>${esc(g.title)}</strong> · ${esc(g.status)}${g.notes ? " — " + esc(g.notes) : ""}</p>`).join("")}</details>`,
+        )
+        .join("") || empty("Save progress after each owner check-in to build the archive."),
+    )}`
+  );
+}
+function ownerEditRow(g, r) {
+  return `<fieldset class="owner-edit-row" data-goal-id="${esc(g.id || "")}"><legend>${esc(g.title || "New goal")}</legend><label>Goal<input data-goal-field="title" required maxlength="1000" value="${esc(g.title || "")}"></label><div class="formgrid"><label>Category<select data-goal-field="category">${options(r.categories, g.category || "Other")}</select></label><label>Due season<input data-goal-field="due_year" type="number" value="${g.due_year || r.year}"></label><label>Position<select data-goal-field="position">${options(["", "C", "1B", "2B", "3B", "SS", "LF", "CF", "RF", "DH", "SP", "RP", "P"], g.position || "")}</select></label><label>Progress<select data-goal-field="status">${options(r.statuses, g.status || "Not assessed")}</select></label></div><label>Progress / owner feedback<textarea data-goal-field="notes" rows="2">${esc(g.notes || "")}</textarea></label><button type="button" data-owner-remove>Remove goal</button></fieldset>`;
+}
+document.addEventListener("click", (e) => {
+  const year = e.target.closest("[data-owner-year]");
+  if (year) {
+    ownerYear = Number(year.dataset.ownerYear);
+    render();
+    return;
+  }
+  if (e.target.closest("#owner-add"))
+    $("#owner-edit-rows").insertAdjacentHTML(
+      "beforeend",
+      ownerEditRow({ id: crypto.randomUUID() }, S.ownerBoard),
+    );
+  if (e.target.closest("[data-owner-remove]")) e.target.closest(".owner-edit-row").remove();
+});
+document.addEventListener("submit", async (e) => {
+  if (e.target.id !== "owner-form") return;
+  e.preventDefault();
+  const form = e.target,
+    f = new FormData(form),
+    error = $("#owner-error"),
+    goals = Array.from(form.querySelectorAll(".owner-edit-row")).map((row) => {
+      const g = { id: row.dataset.goalId };
+      row
+        .querySelectorAll("[data-goal-field]")
+        .forEach((el) => (g[el.dataset.goalField] = el.value));
+      return g;
+    }),
+    button = form.querySelector(".primary");
+  button.disabled = true;
+  error.hidden = true;
+  try {
+    await api(
+      "/api/office/save",
+      {},
+      {
+        action: "owner-goals",
+        year: Number(f.get("year")),
+        owner: f.get("owner"),
+        letter: f.get("letter"),
+        goals,
+      },
+    );
+    ownerYear = Number(f.get("year"));
+    toast("Owner goals and progress saved.");
+    render();
+  } catch (ex) {
+    error.textContent = ex.message;
+    error.hidden = false;
+  } finally {
+    button.disabled = false;
+  }
+});
+const ownerAcquisitionBase = acquisition;
+acquisition = async function () {
+  const html = await ownerAcquisitionBase();
+  return html.replace(
+    '<div class="filters">',
+    ownerContextPanel(S.targets?.owner_goals) + '<div class="filters">',
+  );
+};

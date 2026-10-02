@@ -1,3 +1,81 @@
-'use strict';
-function acquisitionRows(ps){return ps.length?`<div class="panel acquisition-rows">${ps.map(p=>{const a=p.acquisition;if(!a)return rows([p]);return `<article class="acquisition-candidate"><header><div>${link(p)} ${badge(p.position)} ${p.injured||p.on_dl?badge('Injury review','red'):''} ${badge(a.tier,a.premium?'gold':'')}<small>${esc(p.team)} · age ${p.age} · ${fmt(a.overall_current)}/10 current · ${fmt(a.overall_potential)}/10 potential · ${esc(a.availability)}</small></div><div><b>${salary(p)}</b><small>${p.free_agent?'Last exported salary; asking price unknown':'Scheduled salary, not trade cost'}</small></div></header><p class="assessment">${a.premium?'A premium asset to pursue only if we are prepared to discuss a substantial return.':a.incumbent?'An inquiry for '+esc(a.role)+' help against '+esc(a.incumbent)+'.':'An inquiry to address missing '+esc(a.role)+' coverage.'}</p><p>${a.premium?esc(a.reasons[0]):esc(p.summary)} ${a.grade_difference==null?'':`Department fit difference: ${a.grade_difference>0?'+':''}${fmt(a.grade_difference,1)}/10 versus the current role option; a preference comparison, not projected wins.`}</p>${a.locked?note('The current role option is GM-locked. Discuss the fit without assuming that player can be removed.',true):''}<details><summary>Acquisition cost, upside & fit</summary>${a.reasons.map(n=>`<p>${esc(n)}</p>`).join('')}<p>Overall ratings: ${fmt(a.overall_current)}/10 current · ${fmt(a.overall_potential)}/10 potential. ${a.best_defense?'Best currently rated position defense '+fmt(a.best_defense)+'/10.':''}</p><p>Potential tools: ${Object.entries(a.potential_tools).map(([k,v])=>esc(({contact:'Contact',gap:'Gap',power:'Power',eye:'Discipline',strikeouts:'Avoid K',stuff:'Stuff',movement:'Movement',control:'Control'})[k]||k)+' '+fmt(v)).join(' · ')}.</p>${p.fit.notes.map(n=>`<p>${esc(n)}</p>`).join('')}${a.salary_difference==null?'':`<p>Full-season scheduled salary difference versus ${esc(a.incumbent)}: ${a.salary_difference>0?'+':''}${money(a.salary_difference)}. Proration, retained salary, other outgoing players and available funds still require review.</p>`}<p>Actual asking price is unknown. Compare the cost in prospects, current players, payroll and future control with our internal alternative before proposing a deal.</p></details><div class="actions"><button data-player="${p.id}">Full player report</button><button data-watch="${p.id}">Watch</button></div></article>`;}).join('')}</div>`:empty('No outside player passes this need-and-fit screen. Try a specific position, review internal depth, or inspect the wider scouting universe.');}
-drawTargets=function(){const mode=S.targetMode||'all',r=S.targets,offset=S.targetOffset||0,list=$('#target-list');if(mode==='block'){list.innerHTML=note(r.trade_block,true);return;}let ps=mode==='sell'?r.selling:mode==='edges'?r.edges:mode==='premium'?r.premium:mode==='universe'?r.all_players:r.players;const page=ps.slice(offset,offset+12),intro=mode==='premium'?'Premium assets: young upside, established stars and valuable control can make the trade package substantial. Low salary does not make these players cheap to acquire.':mode==='universe'?'Full outside scouting universe. Fit does not establish availability, affordability or a reason to trade.':mode==='edges'?'Skill hypotheses after excluding premium trade assets and checking a current need. Even here, an actual price advantage requires an asking package or free-agent offer.':'Need-based inquiries. The default screen checks lower-graded current roles and rotation help, then looks for a preference improvement. Availability and asking prices still require OOTP inquiries.';list.innerHTML=note(intro)+(mode==='sell'?rows(page):mode==='edges'?page.map(x=>panel(x.player.name,acquisitionRows([x.player])+`<ul>${x.signals.map(s=>`<li>${esc(s)}</li>`).join('')}</ul>`)).join(''):acquisitionRows(page))+`<div class="pagination"><small>${ps.length} ${mode==='premium'?'premium targets':'matches'} · ${ps.length?offset+1:0}–${Math.min(offset+12,ps.length)}</small><div><button data-target-step="-1" ${offset===0?'disabled':''}>Previous</button> <button data-target-step="1" ${offset+12>=ps.length?'disabled':''}>Next</button></div></div>`;};
+"use strict";
+function acquisitionRows(ps) {
+  return ps.length
+    ? `<div class="panel acquisition-rows">${ps
+        .map((p) => {
+          const a = p.acquisition;
+          if (!a) return rows([p]);
+          return `<article class="acquisition-candidate"><header><div>${link(p)} ${badge(p.position)} ${p.injured || p.on_dl ? badge("Injury review", "red") : ""} ${badge(a.tier, a.premium ? "gold" : "")}<small>${esc(p.team)} · age ${p.age} · ${fmt(a.overall_current)}/10 current · ${fmt(a.overall_potential)}/10 potential · ${esc(a.availability)}</small></div><div><b>${salary(p)}</b><small>${p.free_agent ? "Last exported salary; asking price unknown" : "Scheduled salary, not trade cost"}</small></div></header><p class="assessment">${a.premium ? "A premium asset to pursue only if we are prepared to discuss a substantial return." : a.incumbent ? "An inquiry for " + esc(a.role) + " help against " + esc(a.incumbent) + "." : "An inquiry to address missing " + esc(a.role) + " coverage."}</p><p>${a.premium ? esc(a.reasons[0]) : esc(p.summary)} ${a.grade_difference == null ? "" : `Department fit difference: ${a.grade_difference > 0 ? "+" : ""}${fmt(a.grade_difference, 1)}/10 versus the current role option; a preference comparison, not projected wins.`}</p>${a.locked ? note("The current role option is GM-locked. Discuss the fit without assuming that player can be removed.", true) : ""}<details><summary>Acquisition cost, upside & fit</summary>${a.reasons.map((n) => `<p>${esc(n)}</p>`).join("")}<p>Overall ratings: ${fmt(a.overall_current)}/10 current · ${fmt(a.overall_potential)}/10 potential. ${a.best_defense ? "Best currently rated position defense " + fmt(a.best_defense) + "/10." : ""}</p><p>Potential tools: ${Object.entries(
+            a.potential_tools,
+          )
+            .map(
+              ([k, v]) =>
+                esc(
+                  {
+                    contact: "Contact",
+                    gap: "Gap",
+                    power: "Power",
+                    eye: "Discipline",
+                    strikeouts: "Avoid K",
+                    stuff: "Stuff",
+                    movement: "Movement",
+                    control: "Control",
+                  }[k] || k,
+                ) +
+                " " +
+                fmt(v),
+            )
+            .join(
+              " · ",
+            )}.</p>${p.fit.notes.map((n) => `<p>${esc(n)}</p>`).join("")}${a.salary_difference == null ? "" : `<p>Full-season scheduled salary difference versus ${esc(a.incumbent)}: ${a.salary_difference > 0 ? "+" : ""}${money(a.salary_difference)}. Proration, retained salary, other outgoing players and available funds still require review.</p>`}<p>Actual asking price is unknown. Compare the cost in prospects, current players, payroll and future control with our internal alternative before proposing a deal.</p></details><div class="actions"><button data-player="${p.id}">Full player report</button><button data-watch="${p.id}">Watch</button></div></article>`;
+        })
+        .join("")}</div>`
+    : empty(
+        "No outside player passes this need-and-fit screen. Try a specific position, review internal depth, or inspect the wider scouting universe.",
+      );
+}
+drawTargets = function () {
+  const mode = S.targetMode || "all",
+    r = S.targets,
+    offset = S.targetOffset || 0,
+    list = $("#target-list");
+  if (mode === "block") {
+    list.innerHTML = note(r.trade_block, true);
+    return;
+  }
+  let ps =
+    mode === "sell"
+      ? r.selling
+      : mode === "edges"
+        ? r.edges
+        : mode === "premium"
+          ? r.premium
+          : mode === "universe"
+            ? r.all_players
+            : r.players;
+  const page = ps.slice(offset, offset + 12),
+    intro =
+      mode === "premium"
+        ? "Premium assets: young upside, established stars and valuable control can make the trade package substantial. Low salary does not make these players cheap to acquire."
+        : mode === "universe"
+          ? "Full outside scouting universe. Fit does not establish availability, affordability or a reason to trade."
+          : mode === "edges"
+            ? "Skill hypotheses after excluding premium trade assets and checking a current need. Even here, an actual price advantage requires an asking package or free-agent offer."
+            : "Need-based inquiries. The default screen checks lower-graded current roles and rotation help, then looks for a preference improvement. Availability and asking prices still require OOTP inquiries.";
+  list.innerHTML =
+    note(intro) +
+    (mode === "sell"
+      ? rows(page)
+      : mode === "edges"
+        ? page
+            .map((x) =>
+              panel(
+                x.player.name,
+                acquisitionRows([x.player]) +
+                  `<ul>${x.signals.map((s) => `<li>${esc(s)}</li>`).join("")}</ul>`,
+              ),
+            )
+            .join("")
+        : acquisitionRows(page)) +
+    `<div class="pagination"><small>${ps.length} ${mode === "premium" ? "premium targets" : "matches"} · ${ps.length ? offset + 1 : 0}–${Math.min(offset + 12, ps.length)}</small><div><button data-target-step="-1" ${offset === 0 ? "disabled" : ""}>Previous</button> <button data-target-step="1" ${offset + 12 >= ps.length ? "disabled" : ""}>Next</button></div></div>`;
+};
