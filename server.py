@@ -4,6 +4,8 @@ from http.server import BaseHTTPRequestHandler,ThreadingHTTPServer
 from pathlib import Path
 from urllib.parse import urlparse,parse_qs
 import jev
+from playstyle import generate_style
+from readiness import ReadinessDesk,clubs,team_view,organization
 from frontoffice import Office,office_state,save,evaluate,IDENTITIES,MODES,SKILLS,GLOSSARY
 from department import department
 from storage import ROOT,DATA,STATUS,current,snapshots,config,signature,start_import,watcher,read_json,write_json
@@ -40,6 +42,12 @@ class Handler(BaseHTTPRequestHandler):
                 if path=='/api/office':return self.send({'state':office_state(d),'identities':IDENTITIES,'modes':MODES,'skills':SKILLS,'glossary':[{'term':a,'definition':b} for a,b in GLOSSARY]})
                 if path.startswith('/api/office/'):
                     o=Office(d);route=path.rsplit('/',1)[-1]
+                    if route=='playstyle':return self.send(generate_style([x for x in param('identities').split(',') if x],SKILLS))
+                    if route=='readiness-list':return self.send(ReadinessDesk(d,int(param('team') or d.team)).listing(param('q'),param('minor','1')=='1',param('team')=='0',max(0,int(param('offset','0'))),min(50,max(1,int(param('limit','12'))))))
+                    if route=='readiness':
+                        pid=int(param('id'));p=d.by_id.get(pid)
+                        if not p:raise ValueError('Player unavailable in this export.')
+                        return self.send(ReadinessDesk(d,int(param('team') or organization(d,p))).review(pid,param('position') or None,param('hand','vsr')))
                     if route=='home':return self.send(o.home())
                     if route=='players':
                         ps=o.candidates(param('scope','organization'),param('q'),param('kind'),param('position'));sort=param('sort','grade')
@@ -80,7 +88,7 @@ class Handler(BaseHTTPRequestHandler):
                     for p in d.own():writer.writerow({k:(' '+str(p[k]) if isinstance(p.get(k),str) and p[k].startswith(('=','+','-','@')) else p.get(k)) for k in fields})
                     return self.send(buf.getvalue(),content_type='text/csv; charset=utf-8')
                 return self.send({'error':'Unknown report.'},404)
-            assets={'/':'index.html','/app.js':'app.js','/style.css':'style.css','/report.js':'report.js','/lab.js':'lab.js','/home.js':'home.js'}
+            assets={'/':'index.html','/app.js':'app.js','/style.css':'style.css','/report.js':'report.js','/lab.js':'lab.js','/home.js':'home.js','/playstyle.js':'playstyle.js','/readiness.js':'readiness.js'}
             if path not in assets:return self.send({'error':'Not found'},404)
             file=ROOT/'web'/assets[path];typ={'html':'text/html','js':'text/javascript','css':'text/css'}[file.suffix[1:]]
             self.send(file.read_bytes(),content_type=typ+'; charset=utf-8')

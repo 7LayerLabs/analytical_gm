@@ -6,6 +6,7 @@ from storage import DATA, connect, records, read_json, write_json, snapshots
 
 LOCK=threading.RLock()
 IDENTITIES=[
+ {'id':'traditional','name':'Old-school Baseball','tag':'Contact, speed and positional defense','priorities':['Speed near the top of the order','Strongest bat third, power fourth','Contact, defense and purposeful baserunning'],'tradeoff':'Traditional lineup roles are a preference, not a claim of optimized runs.'},
  {'id':'moneyball','name':'Original Moneyball','tag':'Buy overlooked on-base ability','priorities':['Affordable OBP and plate discipline','Patient hitters over reputation','Protect payroll flexibility'], 'tradeoff':'An OBP edge is a hypothesis until acquisition prices confirm it. Defense and pitching still matter.', 'history':'Inspired by Oakland’s late-1990s approach and the 2002 club made famous by Moneyball.'},
  {'id':'edgehunter','name':'Edgehunter','tag':'Find the next mispriced skill','priorities':['Test overlooked skills against this league','Look for platoon, defense and park-fit opportunities','Compare price with our internal alternative'],'tradeoff':'A high rating alone is not an undervalued asset. Salary is only part of acquisition cost.'},
  {'id':'farm','name':'Farm Factory','tag':'Develop a renewable contender','priorities':['Internal depth and player development','Acquire controllable upside','Replace expensive production before it leaves'],'tradeoff':'Development and prospect returns remain uncertain; avoid promoting talent without a role.'},
@@ -75,10 +76,11 @@ def assignment(scores):
     return result
 
 def default_state(d):
-    return {'blueprint':{'seasons':{str(d.year):'Win now',str(d.year+1):'Win now',str(d.year+2):'Hold & evaluate'},'goal':'Make the playoffs; build a club capable of winning the World Series','identities':[], 'philosophy':'Blended','skills':{s:'Preferred' for s in SKILLS},'boundaries':'Protect next season’s contender; assess cost before trading long-term core players.','reason':'Opening team plan','cadence':'Weekly'},'versions':[],'locks':[],'watchlist':[],'decisions':[],'checkpoints':[]}
+    return {'blueprint':{'seasons':{str(d.year):'Win now',str(d.year+1):'Win now',str(d.year+2):'Hold & evaluate'},'goal':'Make the playoffs; build a club capable of winning the World Series','identities':[], 'philosophy':'Blended','playing_notes':'','style_source':[],'style_overrides':[],'skills':{s:'Preferred' for s in SKILLS},'boundaries':'Protect next season’s contender; assess cost before trading long-term core players.','reason':'Opening team plan','cadence':'Weekly'},'versions':[],'locks':[],'watchlist':[],'decisions':[],'checkpoints':[]}
 
 def state_path(d):return DATA/f'frontoffice-team{d.team}-league{d.league}.json'
-def office_state(d):return read_json(state_path(d),default_state(d))
+def office_state(d):
+    base=default_state(d);saved=read_json(state_path(d),base);saved['blueprint']={**base['blueprint'],**saved['blueprint']};return saved
 def stamp(d):return {'id':secrets.token_hex(8),'created_at':datetime.now(timezone.utc).isoformat(),'snapshot':d.sid,'game_date':str(d.manifest['game_date'])}
 
 def save(d,body):
@@ -92,6 +94,9 @@ def save(d,body):
             if b.get('philosophy') not in ['Analytics-led','Traditional','Blended']:raise ValueError('Unknown playing philosophy.')
             if not str(b.get('reason','')).strip():raise ValueError('Explain why you are saving this version.')
             b={k:b.get(k,s['blueprint'].get(k)) for k in s['blueprint']}
+            valid_style={'philosophy','playing_notes',*('skill-'+k for k in SKILLS)}
+            if any(k not in valid_style for k in b['style_overrides']):raise ValueError('Unknown customized style field.')
+            b['style_source']=list(b['identities']);b['playing_notes']=str(b['playing_notes'])[:10000]
             for value in b['skills'].values():
                 if value not in ['Essential','Preferred','Optional']:raise ValueError('Invalid skill priority.')
             if len(b['identities'])!=len(set(b['identities'])):raise ValueError('Choose each identity once.')
@@ -356,9 +361,9 @@ class Office:
         return sorted(result,key=lambda x:(x['year'],x['source']))
 
     def promotion(self,p):
-        d=self.d;rt=d.roster.get(p['id'],{});rules=d.leagues[d.league];used=sum(x['secondary'] for x in d.own() if x['team_id']==d.team);active=len(d.active());notes=[]
+        d=self.d;rt=d.roster.get(p['id'],{});rules=d.leagues[d.league];used=sum(x['secondary'] for x in d.own());active=len(d.active());notes=[]
         if p['injured'] or p['on_dl']:notes.append('Injury flag: check availability and injured-list rules first.')
-        if not p['secondary']:notes.append(f"Needs a 40-man place: {used}/{int(number(rules.get('rules_secondary_roster_limit'),40))} currently assigned to the parent club.")
+        if not p['secondary']:notes.append(f"Needs a 40-man place: {used}/{int(number(rules.get('rules_secondary_roster_limit'),40))} exported across the organization; injured-list exceptions need confirmation.")
         notes.append(f"Active roster: {active}/{int(number(rules.get('rules_active_roster_limit'),26))} healthy active. Count and legality must be checked in OOTP.")
         notes.append('A top prospect needs regular playing time and a development plan. Current talent and projected rate alone do not prove readiness.')
         notes.append('172 service days make a full year. Delaying a debut can affect control, but Super Two thresholds vary; no universal safe promotion date is assumed.')

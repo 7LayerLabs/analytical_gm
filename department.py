@@ -49,7 +49,8 @@ class Department:
         self.base_pit=self.baselines['pit'].get(self.base_year,{})
         self.fip_c=fip_constant(self.base_pit)
         self.profiles=[]; self.by_id={}
-        eligible=[p for p in self.raw.values() if int(p.get('league_id') or 0)==self.league or int(p.get('organization_id') or 0)==self.team or int(p.get('free_agent') or 0)==1 or int(p.get('draft_eligible') or 0)==1]
+        mlb_orgs={tid for tid,t in self.teams.items() if t['league_id']==self.league and t['level']==1 and not t.get('allstar_team')}
+        eligible=[p for p in self.raw.values() if int(p.get('organization_id') or 0) in mlb_orgs or int(p.get('league_id') or 0)==self.league or int(p.get('organization_id') or 0)==self.team or int(p.get('free_agent') or 0)==1 or int(p.get('draft_eligible') or 0)==1]
         # Percentiles are relative to currently assigned MLB players, by hitter/pitcher cohort.
         cohorts={'bat':[], 'pit':[]}
         for p in self.raw.values():

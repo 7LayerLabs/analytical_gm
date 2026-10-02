@@ -9,3 +9,5 @@ Player reports lead with a strong verdict, a smaller grade, a fuller assessment 
 Intended position is a GM choice; the department's best fit is an inspectable preference. Standing locks remain binding. Missing evidence receives an explanation instead of a fabricated outcome. The 1–10 grade is a preference score, not predicted wins.
 
 Keyboard controls, visible focus, labeled inputs, semantic dialogs/tables, text alongside color and responsive grids support desktop and narrow screens. The game date and snapshot context stay visible. The companion never advances or edits OOTP.
+
+The blueprint now generates a playing-style draft from building identities, preserves field-level GM overrides and records them with saved versions. The readiness desk supports all MLB organizations and keeps current-tool benchmarks, potential, actual-level production, inferred role replacement, park fit and transaction/development costs distinct. Its four tabs favor readable verdicts over a continuous report. All assignments and threshold verdicts are explicitly identified as inferred reviews.
