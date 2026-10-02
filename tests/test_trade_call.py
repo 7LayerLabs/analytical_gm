@@ -100,10 +100,27 @@ class LiveCalls(unittest.TestCase):
         self.assertTrue(c["cons"])
         self.assertIn("make it even", c["make_it_work"])
 
-    def test_dumping_our_worst_contract_for_a_useful_player_is_do_it(self):
+    def test_dumping_our_worst_contract_for_a_useful_player_is_good_value(self):
         c = self.call([self.worst], [self.modest])
-        self.assertEqual(c["call"], "Do it")
-        self.assertTrue(any("get out from under" in p for p in c["pros"]))
+        # Good value either way; a contender is told to replace him first if he leaves a hole.
+        self.assertGreater(c["edge"], 0)
+        self.assertIn(c["call"], ["Do it", "Do it if..."])
+        if c["call"] == "Do it if...":
+            self.assertIn("replace", c["make_it_work"])
+        self.assertTrue(any(p.startswith("Sheds") for p in c["pros"]))
+
+    def test_zero_value_depth_is_never_a_reason_to_trade(self):
+        depth = next(
+            p
+            for p in self.d.own()
+            if p["team_id"] != self.d.team
+            and not p["secondary"]
+            and self.e.player(p).get("value", 0) == 0
+            and not p["free_agent"]
+        )
+        c = self.call([depth], [self.modest])
+        self.assertFalse(any(depth["name"] in p for p in c["pros"]))
+        self.assertTrue(any(f"We also give up {depth['name']}" in x for x in c["cons"]))
 
     def test_every_call_names_the_players_and_dollars(self):
         c = self.call([self.best], [self.modest])

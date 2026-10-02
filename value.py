@@ -304,8 +304,14 @@ class ValueEngine:
         in_majors = level == 1
         contract_end = max(p["salaries"]) if p["salaries"] else None
         today = self.current_rate(p)
+        # A veteran on a minor-league deal (off the 40-man, six-plus pro seasons) is a minor-league
+        # free agent after this season, not ours for years.
+        pro_years = number(self.d.roster.get(p["id"], {}).get("pro_service_years"))
+        minor_league_deal = not in_majors and not p.get("secondary") and pro_years >= 6
         debut, seasons = None, []
         for i in range(HORIZON):
+            if minor_league_deal and i > 0:
+                break
             year = self.year + i
             age_then = age + i
             rating = oa + (pot - oa) * progress(self.development, age, age_then) if develops else oa
@@ -436,6 +442,8 @@ class ValueEngine:
         """One plain-English line, the way an assistant GM would say it."""
         if not v["seasons"]:
             return "Replaceable. He doesn't project to be worth a big-league salary, so he carries no trade value."
+        if v["risk"] != "Prospect" and all(s["status"] == "minors" for s in v["seasons"]):
+            return "Minor-league depth: no real trade value."
         money = dollars(v["value"])
         through = v["control_through"]
         wins = f"{v['peak_war']:.1f}-win"

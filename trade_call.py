@@ -75,10 +75,17 @@ def trade_call(office, send, receive, mode, review=None):
         else:
             cons.append(f"We take on {v['name']}'s contract. {line(v, ours=False)}")
     for v in outgoing:
-        if worth(v) > 0:
+        guaranteed = any(s["status"] == "signed" and s["salary"] > 0 for s in v.get("seasons", []))
+        plays = group_of(roles.get(v["name"], "")) is not None  # lineup, rotation or bullpen
+        overpaid = worth(v) <= -5_000_000 and guaranteed
+        if plays or worth(v) >= 1_000_000:
             cons.append(f"We lose {line(v, ours=True)}")
-        else:
-            pros.append(f"We get out from under {v['name']}'s deal: {contract_tail(v)}")
+        elif not overpaid:
+            cons.append(f"We also give up {v['name']}: {v['summary'][0].lower()}{v['summary'][1:]}")
+        if overpaid:
+            pros.append(
+                f"Sheds {v['name']}'s contract: {v['summary'][0].lower()}{v['summary'][1:]}"
+            )
     cons.extend(holes)
     if wins_now >= 0.3:
         pros.append(f"Makes us about {wins_now:.1f} wins better over the rest of {d.year}.")
@@ -95,7 +102,7 @@ def trade_call(office, send, receive, mode, review=None):
     # A contender doesn't take a deal that makes it clearly worse this season, however good
     # the long-term value, unless the hole gets filled first.
     backfill = None
-    if call == "Do it" and mode in CONTENDING and wins_now <= -0.75:
+    if call == "Do it" and mode in CONTENDING and (wins_now <= -0.75 or holes):
         backfill = max(outgoing, key=lambda v: v.get("war_this_season", 0))["name"]
         call, strength = "Do it if...", "lean"
 
@@ -313,6 +320,19 @@ def brief(v):
         "summary": v["summary"],
         "age": v.get("age"),
         "control_through": v.get("control_through"),
+        # The year-by-year math behind the value, so the card can show its work.
+        "seasons": [
+            {
+                "year": s["year"],
+                "partial": i == 0 and s["war"] < s["full_season_war"],
+                "wins": s["war"],
+                "market": s["market"],
+                "salary": s["salary"],
+                "value": s["surplus"],
+                "status": s["status"],
+            }
+            for i, s in enumerate(v.get("seasons", []))
+        ],
     }
 
 
@@ -352,8 +372,9 @@ def headline_for(call, outgoing, give, get, edge, ask_for):
         return f"Close. They need to add about {dollars(-edge)} more{who}."
     if edge >= 5_000_000:
         if give <= 0:
-            shed = f" and shed {dollars(-give)} of bad money" if give < -1_000_000 else ""
-            return f"We get {dollars(get)} of value for nothing we'll miss{shed}."
+            if give < -1_000_000:
+                return f"We get {dollars(get)} of value and shed {dollars(-give)} of bad money."
+            return f"We get {dollars(get)} of value and give up little of value."
         return f"We get {dollars(get)} of value for {dollars(give)}."
     return "Fair deal, with a small edge to us."
 
