@@ -389,12 +389,25 @@ class Office:
 
     def acquisitions(self,free=False,position=''):
         d=self.d;ps=[p for p in d.profiles if p['organization_id']!=d.team and p['team_id']!=d.team and not p['draft_eligible'] and (p['free_agent'] or p['league_id']==d.league) and (not free or p['free_agent']) and (not position or p['position']==position)];ranked=sorted([self.card(p) for p in ps],key=lambda x:x['grade'],reverse=True);own=sorted([self.card(p) for p in d.own() if not p['injured'] and (not position or p['position']==position)],key=lambda x:x['grade'],reverse=True)
+        from acquisition import market_context
+        roster=self.roster();incumbents={x['position']:x['player'] for x in roster['lineup']}
+        for role,rs in [('SP',roster['rotation']),('RP',roster['bullpen'])]:
+            people=[x['player'] for x in rs if x['player']];incumbents[role]=min(people,key=lambda p:p['grade']) if people else None
+        weak={k for k,v in sorted(incumbents.items(),key=lambda x:x[1]['grade'] if x[1] else -1)[:4]};weak.add('SP')
+        for p in ranked:
+            table='players_batting' if p['kind']=='bat' else 'players_pitching';raw=d.by_id[p['id']];m=market_context(p,d.ratings['players_value'].get(p['id'],{}),d.ratings[table].get(p['id'],{}),d.ratings['players_fielding'].get(p['id'],{}),number(d.leagues[d.league].get('rules_fa_minimum_years'),6))
+            role=('SP' if self.role(raw)=='Starters' else 'RP') if p['kind']=='pit' else p['position'];inc=incumbents.get(role);delta=round(p['grade']-inc['grade'],1) if inc else None
+            m.update(role=role,incumbent=inc['name'] if inc else None,incumbent_id=inc['id'] if inc else None,grade_difference=delta,need=bool(position or role in weak),upgrade=bool(inc is None or delta>=.3),locked=bool(inc and any(l['scope'] in ['roster','lineup','rotation','bullpen'] for l in inc['locks'])),salary_difference=round(p['salary']-inc['salary']) if inc and p['salary_known'] and inc['salary_known'] else None)
+            p['acquisition']=m
+        premium=[p for p in ranked if p['acquisition']['premium']]
+        practical=[p for p in ranked if not p['acquisition']['premium'] and p['acquisition']['need'] and p['acquisition']['upgrade'] and not p['injured'] and not p['on_dl']]
+        practical.sort(key=lambda p:(p['free_agent'],p['grade']),reverse=True)
         protected={l['player_id'] for l in self.state['locks'] if l['scope']=='trade'}
         selling=[self.card(p) for p in d.own() if p['salary_known'] and p['id'] not in protected and (not any(r['year']>d.year for r in self.contract_schedule(p)) or (self.b['seasons'].get(str(d.year+1))=='Rebuild'))]
         selling.sort(key=lambda x:(x['years_left'], -x['grade']))
         edges=[]
         for p in ranked:
-            if not p['salary_known'] or not 0<p['salary']<=8000000 or p['injured']:continue
+            if p['acquisition']['premium'] or not p['acquisition']['need'] or not p['acquisition']['upgrade'] or not p['salary_known'] or not 0<p['salary']<=8000000 or p['injured'] or p['on_dl']:continue
             r=d.ratings['players_batting' if p['kind']=='bat' else 'players_pitching'].get(p['id'],{});observed=p['recorded'] or {};signals=[]
             if p['kind']=='bat':
                 gap=number(r.get('batting_ratings_overall_gap'));eye=number(r.get('batting_ratings_overall_eye'));speed=number(r.get('running_ratings_speed'))
@@ -410,7 +423,7 @@ class Office:
                 if number(r.get('pitching_ratings_overall_control'))>=7:signals.append('Control ≥7/10; check strikeout and HR prevention alongside it.')
             if signals:edges.append({'player':p,'signals':signals,'status':'Research signal — price edge unproven'})
         edges.sort(key=lambda x:(len(x['signals']),x['player']['grade'],-x['player']['salary']),reverse=True)
-        return {'players':ranked,'internal':own[:5],'selling':selling,'edges':edges[:20],'trade_block':'Unverified: trade_status exists in the CSV, but its code-to-availability mapping has not been confirmed. Other-club players below are research targets, not declared available.','edge':'Edgehunter hypotheses: strong OBP ratings, useful platoon skills or park-fit gap power. Confirm asking price, development cost and replacement value before calling any player a bargain.'}
+        return {'players':practical,'all_players':ranked,'premium':premium,'internal':[{**incumbents[k],'comparison_role':k} for k in (['SP','RP'] if position=='P' else [position] if position else sorted(weak)) if incumbents.get(k)],'selling':selling,'edges':edges[:20],'trade_block':'Unverified: trade_status exists in the CSV, but its code-to-availability mapping has not been confirmed. Other-club players below are research targets, not declared available.','edge':'Edgehunter hypotheses: strong OBP ratings, useful platoon skills or park-fit gap power. Confirm asking price, development cost and replacement value before calling any player a bargain.'}
 
     def development(self):
         d=self.d;dev=d.development();prospects=dev['prospects'];draft=[p for p in d.profiles if p['draft_eligible']];depth=collections.Counter(p['position'] for p in d.own() if p['team_id']!=d.team)
