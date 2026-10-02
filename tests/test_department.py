@@ -152,8 +152,11 @@ class LiveSaveChecks(unittest.TestCase):
             self.d.scenario([send["id"]], [send["id"]])
 
     def test_unchanged_import_is_noop(self):
-        before = current()["id"]
-        self.assertEqual(import_snapshot()["id"], before)
+        before = current()
+        # Never import a new export into the live data folder from a test run.
+        if before["signature"] != [list(x) for x in storage.signature()]:
+            self.skipTest("The OOTP export changed since the last import; the app will import it.")
+        self.assertEqual(import_snapshot()["id"], before["id"])
 
     def test_backtest_evidence(self):
         q = self.d.quality()
