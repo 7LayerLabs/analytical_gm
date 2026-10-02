@@ -1,4 +1,4 @@
-import argparse,csv,io,json,os,secrets,threading,traceback,webbrowser
+import argparse,csv,io,json,os,secrets,threading,traceback,webbrowser,time
 from datetime import datetime,timezone
 from http.server import BaseHTTPRequestHandler,ThreadingHTTPServer
 from pathlib import Path
@@ -129,11 +129,26 @@ class Handler(BaseHTTPRequestHandler):
         except Exception:
             traceback.print_exc();self.send({'error':'The action failed. Local analytics remain available.'},500)
 
+def archive_predictions():
+    # Every completed export gets a forecast, even while the GM is on another page.
+    from season_projection import season_projection
+    seen=set()
+    while True:
+        for snapshot in reversed(snapshots()):
+            if snapshot['id'] in seen:continue
+            try:season_projection(department(snapshot['id']))
+            except (ValueError,FileNotFoundError):pass  # Unsupported evidence remains visible on the clubhouse.
+            except Exception:traceback.print_exc()
+            seen.add(snapshot['id'])
+        time.sleep(5)
+
+
 def main():
     global PORT
     parser=argparse.ArgumentParser();parser.add_argument('--port',type=int,default=8765);parser.add_argument('--open',action='store_true');args=parser.parse_args();PORT=args.port
     server=ThreadingHTTPServer(('127.0.0.1',PORT),Handler)
     threading.Thread(target=watcher,daemon=True).start()
+    threading.Thread(target=archive_predictions,daemon=True).start()
     if not current():start_import()
     url=f'http://127.0.0.1:{PORT}'
     print('OOTP Analytics Department: '+url,flush=True)
