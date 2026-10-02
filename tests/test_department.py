@@ -288,8 +288,8 @@ class ImportSafety(unittest.TestCase):
             source, data = self.fixture(Path(tmp))
             cfg = {"csv_directory": str(source), "team_id": 4, "league_id": 203}
             with patch.object(storage, "DATA", data), patch.object(
-                storage, "config", return_value=cfg
-            ):
+                storage, "SNAPSHOTS", data
+            ), patch.object(storage, "config", return_value=cfg):
                 first = storage.import_snapshot()
                 sig = storage.signature()
                 changed = sig + [("changed.csv", 1, 1)]
@@ -304,6 +304,8 @@ class ImportSafety(unittest.TestCase):
             source, data = self.fixture(Path(tmp))
             (source / "players.csv").write_text("player_id\n1\n")
             with patch.object(storage, "DATA", data), patch.object(
+                storage, "SNAPSHOTS", data
+            ), patch.object(
                 storage,
                 "config",
                 return_value={"csv_directory": str(source), "team_id": 4, "league_id": 203},

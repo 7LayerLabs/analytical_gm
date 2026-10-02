@@ -20,6 +20,8 @@ from storage import (
     watcher,
     read_json,
     write_json,
+    migrate_snapshots,
+    prune,
 )
 
 JOURNAL_LOCK = threading.Lock()
@@ -384,6 +386,8 @@ def main():
     parser.add_argument("--open", action="store_true")
     args = parser.parse_args()
     PORT = args.port
+    migrate_snapshots()
+    prune()
     server = LocalHTTPServer(("127.0.0.1", PORT), Handler)
     threading.Thread(target=watcher, daemon=True).start()
     threading.Thread(target=archive_predictions, daemon=True).start()

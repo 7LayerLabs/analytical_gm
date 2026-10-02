@@ -33,7 +33,7 @@ def arbitration_review_candidate(
 
 class Department:
     def __init__(self, sid=None):
-        self.manifest = current() if sid is None else read_json(DATA / sid / "manifest.json")
+        self.manifest = current() if sid is None else read_json(SNAPSHOTS / sid / "manifest.json")
         if not self.manifest:
             raise ValueError("No imported snapshot yet.")
         self.sid = self.manifest["id"]
@@ -732,7 +732,7 @@ class Department:
         }
 
     def quality(self):
-        path = DATA / self.sid / "backtest.json"
+        path = SNAPSHOTS / self.sid / "backtest.json"
         result = read_json(path)
         if not result or "tests" not in result:
             result = {
@@ -765,7 +765,7 @@ class Department:
 def department(sid=None):
     if sid is not None and not re.fullmatch(r"\d{8}T\d{12}Z", sid):
         raise ValueError("Invalid snapshot identifier.")
-    m = current() if sid is None else read_json(DATA / sid / "manifest.json")
+    m = current() if sid is None else read_json(SNAPSHOTS / sid / "manifest.json")
     if not m:
         raise ValueError("Import an export first.")
     with MODEL_LOCK:

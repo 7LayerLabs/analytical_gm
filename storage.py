@@ -6,8 +6,12 @@ import re
 from analytics import BAT_FIELDS, PIT_FIELDS, combine
 
 ROOT = Path(__file__).resolve().parent
+# Small, valuable state (blueprints, journal, saved cases, forecast archive) stays beside the app.
 DATA = ROOT / "data"
 DATA.mkdir(exist_ok=True)
+# Big, rebuildable export snapshots live on the local disk, outside OneDrive sync.
+LOCAL = Path(os.environ.get("LOCALAPPDATA") or Path.home()) / "OOTP-Analytics"
+KEEP_SNAPSHOTS = 20  # newest exports kept; only the newest keeps its raw CSV copy
 LOCK = threading.Lock()
 STATUS = {"running": False, "message": "Ready", "error": None}
 REQUIRED = {
@@ -50,6 +54,35 @@ def config():
     return read_json(ROOT / "game-access.json", read_json(ROOT / "game-access.example.json"))
 
 
+SNAPSHOTS = Path((config() or {}).get("snapshot_directory") or LOCAL / "snapshots")
+SNAPSHOTS.mkdir(parents=True, exist_ok=True)
+
+
+def migrate_snapshots():
+    """One-time move of snapshot folders that used to live in data/ (inside OneDrive)."""
+    moved = 0
+    for folder in DATA.iterdir():
+        if re.fullmatch(r"\d{8}T\d{12}Z", folder.name) and (folder / "manifest.json").exists():
+            if not (SNAPSHOTS / folder.name).exists():
+                shutil.move(str(folder), str(SNAPSHOTS / folder.name))
+                moved += 1
+    return moved
+
+
+def prune(keep=KEEP_SNAPSHOTS):
+    """Keep the newest snapshots. Older ones lose their raw CSV copy (the database already holds
+    the same rows); anything past `keep` is removed. The current snapshot is never touched."""
+    pointer = read_json(DATA / "current.json") or {}
+    for i, m in enumerate(snapshots()):
+        folder = SNAPSHOTS / m["id"]
+        if m["id"] == pointer.get("id"):
+            continue
+        if i >= keep:
+            shutil.rmtree(folder, ignore_errors=True)
+        elif i >= 1:
+            shutil.rmtree(folder / "csv", ignore_errors=True)
+
+
 def signature():
     p = Path(config()["csv_directory"])
     return [(f.name, f.stat().st_size, f.stat().st_mtime_ns) for f in sorted(p.glob("*.csv"))]
@@ -57,7 +90,7 @@ def signature():
 
 def snapshots():
     return sorted(
-        [read_json(p) for p in DATA.glob("*/manifest.json")],
+        [read_json(p) for p in SNAPSHOTS.glob("*/manifest.json")],
         key=lambda x: x["created_at"],
         reverse=True,
     )
@@ -65,16 +98,16 @@ def snapshots():
 
 def current():
     pointer = read_json(DATA / "current.json")
-    return read_json(DATA / pointer["id"] / "manifest.json") if pointer else None
+    return read_json(SNAPSHOTS / pointer["id"] / "manifest.json") if pointer else None
 
 
 def connect(sid=None):
     if sid is not None and not re.fullmatch(r"\d{8}T\d{12}Z", sid):
         raise ValueError("Invalid snapshot identifier.")
-    m = current() if not sid else read_json(DATA / sid / "manifest.json")
+    m = current() if not sid else read_json(SNAPSHOTS / sid / "manifest.json")
     if not m:
         raise ValueError("Import an OOTP export first.")
-    return duckdb.connect(str(DATA / m["id"] / "analytics.duckdb"), read_only=True)
+    return duckdb.connect(str(SNAPSHOTS / m["id"] / "analytics.duckdb"), read_only=True)
 
 
 def records(con, sql, params=None):
@@ -104,7 +137,7 @@ def import_snapshot(force=False):
                 if missing:
                     raise ValueError(f"{table}: missing columns {sorted(missing)}")
         sid = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%S%fZ")
-        folder = DATA / sid
+        folder = SNAPSHOTS / sid
         folder.mkdir()
         raw = folder / "csv"
         raw.mkdir()
@@ -227,12 +260,13 @@ def import_snapshot(force=False):
             con.close()
         write_json(DATA / "current.json", {"id": sid})
         STATUS["message"] = "Snapshot ready"
+        prune()
         return manifest
     except Exception as e:
         # Only the incomplete directory created by this import can be removed.
         if sid:
-            failed = (DATA / sid).resolve()
-            if failed.parent == DATA.resolve() and not (failed / "manifest.json").exists():
+            failed = (SNAPSHOTS / sid).resolve()
+            if failed.parent == SNAPSHOTS.resolve() and not (failed / "manifest.json").exists():
                 shutil.rmtree(failed)
         STATUS.update(message="Import failed; previous snapshot retained", error=str(e))
         raise

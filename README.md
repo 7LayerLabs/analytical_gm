@@ -27,7 +27,7 @@ Skills compare inferred regular starters at the intended position first, then al
 2. Click **Update Files**. The running companion also checks for completed stable exports every ten seconds.
 3. Verify the game date in the header. The snapshot selector lets you examine previous exports.
 
-Update Files reads existing CSVs; it does not make OOTP export. Failed imports preserve the prior valid snapshot. Each snapshot retains all 70 source CSVs, a DuckDB database, file hashes, row counts and a manifest. Allow disk space for approximately 234 MB of CSVs per capture plus its database. No unexported date has a synthetic rating history.
+Update Files reads existing CSVs; it does not make OOTP export. Failed imports preserve the prior valid snapshot. Each snapshot is a DuckDB database with file hashes, row counts and a manifest, stored outside OneDrive in `%LOCALAPPDATA%\OOTP-Analytics\snapshots` (override with `snapshot_directory` in `game-access.json`). The newest snapshot also keeps its raw CSV copy (about 300 MB); older ones keep only the database (about 110 MB), and only the newest 20 are kept. No unexported date has a synthetic rating history.
 
 ## The redesigned department
 
@@ -69,7 +69,7 @@ An optional TypeSafe key can be remembered with Windows DPAPI under `%LOCALAPPDA
 
 ## Storage and verification
 
-`game-access.json` selects the source save, team and league. `data/frontoffice-team4-league203.json` stores blueprint versions, locks, watchlists, checkpoints and saved cases; `data/journal.json` stores notes. Snapshot data remains separate. The app binds to 127.0.0.1 and rejects external origins for mutations. Credentials are not in these state files.
+`game-access.json` selects the source save, team and league. `data/frontoffice-team4-league203.json` stores blueprint versions, locks, watchlists, checkpoints and saved cases; `data/journal.json` stores notes. These small state files stay in `data/` beside the app; snapshots live in the local folder above. The app binds to 127.0.0.1 and rejects external origins for mutations. Credentials are not in these state files.
 
 Run `python -m unittest discover -s tests -q` for mathematical, import, contract and department checks. The redesign has also been checked in the browser at desktop and 390-pixel widths, including navigation, report tabs, league tabs, case evaluation/saving, and a live Jev review. Live-save integration tests run when a local imported snapshot exists; portable unit tests run without private exports.
 
