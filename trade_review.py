@@ -9,6 +9,26 @@ def trade_verdict(core_lost,comparable_core,now_gain,recovery_gain,mode,missing=
     if now_gain>=.15 and recovery_gain>=-.05:return 'Worth pursuing'
     return 'Revise the package'
 
+
+def owner_goal_signal(category,now_gain,recovery_gain,core_loss,position_changes=None,core_gain=False):
+    if category=='Playoffs':
+        if now_gain>=.15:return {'signal':'green','label':'Helps the goal','read':'Improves the current inferred MLB assignments. That supports the playoff push, but does not prove qualification or calculate playoff odds.'}
+        if now_gain<-.05:return {'signal':'red','label':'Works against the goal','read':'Weakens the current inferred MLB assignments, working against the playoff push.'}
+        return {'signal':'red','label':'No demonstrated progress','read':'The current roster comparison shows too little improvement to establish help toward the playoff goal. This does not mean the goal is impossible.'}
+    if category=='Position upgrade':
+        values=position_changes or [0];average=sum(values)/len(values)
+        if average>=.3 and min(values)>=0:return {'signal':'green','label':'Helps the goal','read':'The requested position improves in the inferred lineup, with no preference loss against either pitcher hand. Confirm the owner’s upgrade assessment in OOTP.'}
+        if average<-.1 and max(values)<=0:return {'signal':'red','label':'Works against the goal','read':'The requested position becomes weaker in the inferred assignments.'}
+        if max(values)>0 and min(values)<0:return {'signal':'amber','label':'Mixed matchup impact','read':'The position improves against one pitcher hand but weakens against the other. It is not a clear overall upgrade.'}
+        return {'signal':'red','label':'No demonstrated progress','read':'This package does not establish a meaningful upgrade at the requested position. A different name or a bench addition does not by itself satisfy this goal.'}
+    if category=='Championship window':
+        if core_loss:return {'signal':'red','label':'Works against the goal','read':'Gives up a young foundation without comparable core talent in return, weakening the longer championship path.'}
+        if recovery_gain<-.15:return {'signal':'red','label':'Works against the goal','read':'The recovered-roster comparison becomes meaningfully weaker, reducing the foundation for the next contention window.'}
+        if core_gain and recovery_gain>=-.05:return {'signal':'green','label':'Helps build the window','read':'Adds a young, controlled core candidate without a meaningful recovery-scenario roster loss. This supports the longer championship path; development and winning a title remain uncertain.'}
+        return {'signal':'amber','label':'Long-term impact uncertain','read':'The review does not project a four-season championship window. Compare development, control and future payroll before claiming progress.'}
+    explanations={'Popularity':'The national popularity labels have not been verified for this package. Current ability, salary and reputation are not proof of the owner’s nationally-popular standard.','Chemistry':'No validated before-and-after team chemistry measure is available. Check leadership, personalities and the clubhouse report in OOTP.','Fan interest':'A future fan-interest response cannot be established from the package alone. Observe the exported change and the owner’s next check-in.','Other':'This goal needs a specific measurable standard or owner feedback before the package can be scored.'}
+    return {'signal':'amber','label':'Needs confirmation','read':explanations.get(category,explanations['Other'])}
+
 def analyze_trade(office,send,receive,mode):
     d=office.d
     if not send or not receive:raise ValueError('Choose at least one outgoing and one incoming player.')
@@ -87,15 +107,15 @@ def analyze_trade(office,send,receive,mode):
     from owner_goals import owner_context
     impacts=[]
     for g in owner_context(office)['goals']:
-        if g['category']=='Playoffs':impacts.append({'goal':g['title'],'read':'The immediate assignment improvement does not establish a meaningful playoff gain or justify the core talent cost.' if foundations and not comparable else 'Assess the changed MLB roles against the talent cost. This review does not calculate playoff odds.'})
-        elif g['category']=='Position upgrade':
-            pos=g['position'];changed_roles=[x for c in comparisons for x in c['changes'] if x['role']==pos]
-            impacts.append({'goal':g['title'],'read':'Changes the inferred '+pos+' assignment; compare the two players before calling this an upgrade.' if changed_roles else 'This package does not change the inferred '+pos+' starter; it does not demonstrate progress toward this goal.'})
-        elif g['category']=='Championship window':impacts.append({'goal':g['title'],'read':'Giving up a young foundation without a comparable return conflicts with the longer contention path.' if foundations and not comparable else 'Review controlled role value and future payroll, not just today’s salary difference.'})
-        elif g['category'] in ['Popularity','Chemistry','Fan interest']:impacts.append({'goal':g['title'],'read':'Not established by this review. Verify popularity/clubhouse information in OOTP; a trade does not guarantee an increase.'})
-    uncertain=[x for x in impacts if x['read'].startswith('Not established')]
-    if uncertain:
-        impacts=[x for x in impacts if x not in uncertain]+[{'goal':'; '.join(x['goal'] for x in uncertain),'read':'None of these outcomes is demonstrated by this package. Check national popularity and clubhouse reports; any fan-interest response remains uncertain.'}]
+        category=g['category'];position_changes=[]
+        if category=='Position upgrade':
+            for c in comparisons:
+                changed_role=next((x for x in c['changes'] if x['role']==g['position']),None)
+                position_changes.append((changed_role['after']['grade'] if changed_role and changed_role['after'] else 0)-(changed_role['before']['grade'] if changed_role and changed_role['before'] else 0) if changed_role else 0)
+        fa_threshold=number(d.leagues[d.league].get('rules_fa_minimum_years'),6)
+        controlled_core_gain=len([p for p in incoming if core(p) and (number(p.get('service_years'))<fa_threshold or any(r['year']>d.year for r in office.contract_schedule(p)))])>len(foundations)
+        signal=owner_goal_signal(category,now_gain,recovery_gain,bool(foundations) and not comparable,position_changes,controlled_core_gain)
+        impacts.append({'goal':g['title'],'category':category,**signal})
     active_now=sum(p['team_id']==d.team and p['active'] and not p['on_dl'] and not p['dfa'] for p in d.own());active_removed=sum(p['active'] and not p['on_dl'] and not p['dfa'] for p in outgoing);healthy_added=sum(not p['injured'] and not p['on_dl'] for p in incoming);active_after=active_now-active_removed+healthy_added;limit=int(number(d.leagues[d.league].get('rules_active_roster_limit'),26))
     warnings.insert(0,f'Active-roster scenario: {active_now} now, {active_removed} outgoing active players, {healthy_added} healthy incoming MLB assignments = {active_after} before other moves. '+(f'Review {active_after-limit} additional assignments to reach the {limit}-player limit; trading an injured-list player does not clear an active spot.' if active_after>limit else 'Confirm the actual game limit and eligibility.'))
     checks=list(dict.fromkeys(warnings))+['The post-trade roster assumes incoming players can be assigned to MLB; verify active and 40-man room, options, waivers and any no-trade restrictions.','Renewal/arbitration, options, retained salary and proration can change the real cost. Missing future salaries are unknown, not zero.']

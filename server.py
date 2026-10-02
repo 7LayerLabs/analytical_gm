@@ -13,6 +13,10 @@ from storage import ROOT,DATA,STATUS,current,snapshots,config,signature,start_im
 JOURNAL_LOCK=threading.Lock()
 PORT=8765
 
+class LocalHTTPServer(ThreadingHTTPServer):
+    # Allow the browser's startup asset burst while snapshot workers are loading.
+    request_queue_size=64
+
 class Handler(BaseHTTPRequestHandler):
     def log_message(self,fmt,*args):
         # Never log request bodies, query strings or secrets.
@@ -152,7 +156,7 @@ def archive_predictions():
 def main():
     global PORT
     parser=argparse.ArgumentParser();parser.add_argument('--port',type=int,default=8765);parser.add_argument('--open',action='store_true');args=parser.parse_args();PORT=args.port
-    server=ThreadingHTTPServer(('127.0.0.1',PORT),Handler)
+    server=LocalHTTPServer(('127.0.0.1',PORT),Handler)
     threading.Thread(target=watcher,daemon=True).start()
     threading.Thread(target=archive_predictions,daemon=True).start()
     if not current():start_import()
