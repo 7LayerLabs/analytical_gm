@@ -449,10 +449,12 @@ async function lab() {
 function caseReport(r) {
   return (
     ownerContextPanel(r.owner_goals) +
-    panel(
-      "The department’s recommendation",
-      `<h2>${esc(r.recommendation)}</h2><p>${esc(r.why)}</p>${badge(r.locks_respected ? "Standing locks respected" : "Unlocked scenario only", r.locks_respected ? "green" : "gold")} ${badge(r.scenario_mode)}<p><small>Captured ${date(r.game_date)} · offers, service days and scenario direction are assumptions.</small></p>`,
-    ) +
+    (r.call // the assistant GM's card above already gives the answer
+      ? ""
+      : panel(
+          "The department’s recommendation",
+          `<h2>${esc(r.recommendation)}</h2><p>${esc(r.why)}</p>${badge(r.locks_respected ? "Standing locks respected" : "Unlocked scenario only", r.locks_respected ? "green" : "gold")} ${badge(r.scenario_mode)}<p><small>Captured ${date(r.game_date)} · offers, service days and scenario direction are assumptions.</small></p>`,
+        )) +
     panel(
       "Alternatives",
       r.alternatives

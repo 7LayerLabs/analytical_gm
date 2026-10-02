@@ -358,6 +358,32 @@ class ValueEngine:
                 break
         return seasons
 
+    def chance_develops(self, p):
+        """1.0 for finished players; otherwise the odds a young player grows into his potential."""
+        oa, pot = self.rating(p)
+        if int(number(p["age"])) >= 26 or pot <= oa:
+            return 1.0
+        level = self.level(p)
+        return DEVELOPS.get(level, DEVELOPS_OTHER) if level else DEVELOPS_OTHER
+
+    def forecast(self, p, last_year):
+        """Full-season WAR each year through last_year, ignoring who controls him (for signings
+        and extensions). Young players are weighted by their chance to develop."""
+        role, (oa, pot) = self.role(p), self.rating(p)
+        age, today, chance = int(number(p["age"])), self.current_rate(p), self.chance_develops(p)
+        seasons = []
+        for i in range(max(0, last_year - self.year + 1)):
+            grown = oa + (pot - oa) * progress(self.development, age, age + i)
+            rates = [
+                self.aged(
+                    role, today + self.war_rate(role, r) - self.war_rate(role, oa), age, age + i
+                )
+                for r in (grown, oa)
+            ]
+            war = max(0.0, chance * rates[0] + (1 - chance) * rates[1])
+            seasons.append({"year": self.year + i, "age": age + i, "war": round(war, 2)})
+        return seasons
+
     def player(self, p):
         oa, pot = self.rating(p)
         level = self.level(p)
@@ -372,10 +398,7 @@ class ValueEngine:
                 "summary": f"Free agent. Projects around {war:.1f} wins a season; "
                 f"that's worth about {dollars(war * self.dollars_per_war)} a year on the market.",
             }
-        young = int(number(p["age"])) < 26 and pot > oa
-        chance = (
-            (DEVELOPS.get(level, DEVELOPS_OTHER) if level else DEVELOPS_OTHER) if young else 1.0
-        )
+        chance = self.chance_develops(p)
         up = self.path(p, True)
         flat = self.path(p, False) if chance < 1 else up
 

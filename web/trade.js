@@ -1,22 +1,24 @@
 "use strict";
+// The assistant GM's call card for every Decision Lab question that has one.
 const caseReportBeforeTrade = caseReport;
 caseReport = function (r) {
-  return r.trade_review
-    ? tradeReport(r)
-    : (r.type === "Trade"
-        ? note(
-            "This saved trade report uses the earlier format. Run a new review for a current verdict and roster comparison.",
-            true,
-          )
-        : "") + caseReportBeforeTrade(r);
+  if (r.trade_review) return tradeReport(r);
+  if (r.call) return callCard(r) + seeTheNumbers(caseReportBeforeTrade(r));
+  return (
+    (r.type === "Trade"
+      ? note(
+          "This saved trade report uses the earlier format. Run a new review for a current verdict and roster comparison.",
+          true,
+        )
+      : "") + caseReportBeforeTrade(r)
+  );
 };
+const seeTheNumbers = (html) =>
+  `<details class="see-numbers"><summary>See the numbers: the analytics department's full review</summary>${html}</details>`;
 // The assistant GM's call leads; the analytics department's full review folds underneath.
 function tradeReport(r) {
   if (!r.call) return legacyVerdict(r) + analyticsReview(r);
-  return (
-    callCard(r) +
-    `<details class="see-numbers"><summary>See the numbers: the analytics department's full review</summary>${analyticsReview(r)}</details>`
-  );
+  return callCard(r) + seeTheNumbers(analyticsReview(r));
 }
 
 const CALL_STYLE = { "Do it": "go", "Do it if...": "maybe", "Don't": "no", "Hang up": "stop" };
@@ -38,17 +40,25 @@ function callCard(r) {
     label === "We give"
       ? "Less than nothing: a contract we're better off without."
       : "Less than nothing: we'd be taking on a bad contract.";
-  const side = (label, total, players) =>
-    `<div class="ledger-side"><span class="eyebrow">${label}</span><strong>${worth(total)}</strong>${total < 0 ? `<small>${below(label)}</small>` : ""}<ul>${players
+  const side = ({ label, total, players = [], note = "" }) =>
+    `<div class="ledger-side"><span class="eyebrow">${esc(label)}</span><strong>${worth(total)}</strong>${total < 0 ? `<small>${below(label)}</small>` : note ? `<small>${esc(note)}</small>` : ""}<ul>${players
       .map((p) => `<li>${link(p)}<b>${worth(p.value)}</b></li>`)
       .join("")}</ul></div>`;
+  const ledger = c.ledger?.length
+    ? c.ledger
+    : c.give_players
+      ? [
+          { label: "We give", total: c.give, players: c.give_players },
+          { label: "We get", total: c.get, players: c.get_players },
+        ]
+      : [];
   return `<section class="panel call-card call-${CALL_STYLE[c.call] || "maybe"}">
     <div class="call-top"><span class="eyebrow">Assistant GM · ${esc(c.mode)} · ${date(r.game_date)}</span>
       <h2 class="call-word">${esc(c.call)} <small>${c.strength === "strong" ? "Strong call" : "Lean"}</small></h2>
       <p class="call-headline">${esc(c.headline)}</p></div>
-    <div class="ledger">${side("We give", c.give, c.give_players)}${side("We get", c.get, c.get_players)}</div>
+    ${ledger.length ? `<div class="ledger">${ledger.map(side).join("")}</div>` : ""}
     <div class="procon"><div><h3>Why it helps</h3>${items(c.pros, "Nothing.")}</div><div><h3>What it costs us</h3>${items(c.cons, "Nothing that matters.")}</div></div>
-    ${c.roster.length ? `<div class="call-roster"><h3>On the field</h3>${items(c.roster, "")}</div>` : ""}
+    ${c.roster?.length ? `<div class="call-roster"><h3>On the field</h3>${items(c.roster, "")}</div>` : ""}
     ${c.make_it_work ? `<p class="make-it-work"><strong>What would make it work:</strong> ${esc(c.make_it_work)}</p>` : ""}
     <small class="call-foot">Value = projected wins × ${worth(c.price_of_a_win)} a win (what this league pays) − salary, over the years we control each player. Make the move in OOTP.</small>
   </section>`;

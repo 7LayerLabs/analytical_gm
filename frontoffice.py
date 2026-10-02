@@ -1836,4 +1836,20 @@ def evaluate(d, case):
         ]
     if "Promotion" == kind and p and (p["injured"] or p["on_dl"]):
         base["checks"].append("Selected prospect is injured; do not treat him as ready to play.")
+    if kind in ("Signing", "Extension", "Promotion") and p:
+        from player_calls import extension_call, promotion_call, signing_call
+
+        years = int(number(case.get("offer_years")))  # 0 = let the assistant GM pick the length
+        if kind == "Signing":
+            c = signing_call(o, p, assumptions["annual_offer"], years, mode)
+        elif kind == "Extension":
+            start = int(number(case.get("start_year"))) or None
+            c = extension_call(o, p, assumptions["annual_offer"], years, start, mode)
+        else:
+            c = promotion_call(o, p, mode)
+        base["call"] = c
+        base["recommendation"] = (
+            c["call"] + (" " if c["call"].endswith("...") else ". ") + c["headline"]
+        )
+        base["why"] = base["recommendation"]
     return base
