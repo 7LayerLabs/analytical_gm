@@ -84,3 +84,36 @@ function seasonPrediction(current) {
     )}</details><details class="forecast-detail"><summary>Method & limitations</summary>${p.method.map((s) => `<p>${esc(s)}</p>`).join("")}<p>${p.sources.map((s) => `<a href="${esc(s.url)}" target="_blank" rel="noopener noreferrer">${esc(s.label)}</a>`).join(" · ")}</p></details><details class="forecast-detail"><summary>Prediction archive (${archive.length})</summary>${table(["Export date", "Prediction", "Context"], archiveRows)}<p>Every reviewed export is retained, including unchanged estimates. Roster and injury notes describe observed inputs; they do not isolate the exact cause of a win change.</p></details><p class="forecast-foot">Experimental model · planning range is not a confidence interval.<br>Roster captured ${date(p.game_date)}${current.opening_forecast ? " · preseason baseline preserved" : ""}.</p></div>`,
   );
 }
+
+// The assistant GM's suggested moves lead the Clubhouse: each one a chain of steps with a
+// side-by-side comparison (real lines with league context, tools, projected wins).
+const MOVE_STYLE = { "Do it": "go", "Worth a look": "maybe", "Be ready": "ready" };
+function gmMoves(m, h) {
+  const actions = `<div class="actions"><button data-nav="trades" class="primary">Analyze a trade</button><button data-nav="lab">Open a decision</button><button data-nav="roster">Roster lab</button></div>`;
+  if (!m || m.error)
+    return `<article class="lead"><span class="eyebrow">YOUR ASSISTANT GM</span><h2>${esc(m?.error || "Suggestions are unavailable for this export.")}</h2>${actions}</article>`;
+  const depth = m.depth.length
+    ? `<div class="move-depth"><h3>Depth to know about</h3><ul>${m.depth
+        .map(
+          (dp) =>
+            `<li><strong>${esc(dp.headline)}</strong> ${dp.players.map((c) => `${link(c)}: ${esc(c.line)}`).join("; ")}</li>`,
+        )
+        .join("")}</ul></div>`
+    : "";
+  return `<article class="lead gm-moves"><span class="eyebrow">YOUR ASSISTANT GM · ${date(S.status.snapshot.game_date)}</span><h2>${esc(m.headline)}</h2><p class="gm-goal">${esc(h.blueprint.goal)}</p>${m.moves.map(moveCard).join("")}${depth}${actions}</article>`;
+}
+function moveCard(m) {
+  const style = MOVE_STYLE[m.call] || "maybe";
+  const gain =
+    m.gain_rest_of_year > 0
+      ? `<span class="move-gain">+${fmt(m.gain_rest_of_year, 1)} wins the rest of the way</span>`
+      : "";
+  const comps = table(
+    ["Player", "This year", "Wins / season"],
+    m.comps.map(
+      (c) =>
+        `<tr><td>${link(c)}<small>${esc(c.role)} · ${esc(c.where)} · age ${c.age}${c.options ? " · " + esc(c.options) : ""}</small></td><td>${esc(c.line)}<small>${esc(c.tools)}</small></td><td class="num">${fmt(c.wins, 1)}</td></tr>`,
+    ),
+  );
+  return `<section class="move-card move-${style}"><div class="move-head"><span class="call-chip call-${style}">${esc(m.call)}</span><h3>${esc(m.title)}</h3>${gain}</div><p>${esc(m.why)}</p><ol class="move-chain">${m.chain.map((x) => `<li>${esc(x)}</li>`).join("")}</ol>${comps}</section>`;
+}

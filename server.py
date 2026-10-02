@@ -132,6 +132,10 @@ class Handler(BaseHTTPRequestHandler):
                         return self.send(organizational_direction(o))
                     if route == "home":
                         return self.send(o.home())
+                    if route == "moves":
+                        from moves import suggested_moves
+
+                        return self.send(suggested_moves(o))
                     if route == "players":
                         ps = o.candidates(
                             param("scope", "organization"),

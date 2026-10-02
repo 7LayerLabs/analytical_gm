@@ -194,6 +194,11 @@ async function render() {
       connections: "guide",
     }[S.page] || S.page;
   $$("nav a").forEach((a) => a.classList.toggle("active", a.hash === "#" + S.page));
+  const more = $(".nav-more");
+  if (more) {
+    more.open = false;
+    more.querySelector("summary").classList.toggle("active", !!more.querySelector("a.active"));
+  }
   $("#content").innerHTML = '<div class="loading">Preparing your department’s report…</div>';
   try {
     S.office = await api("/api/office");
@@ -210,6 +215,7 @@ async function render() {
         readiness,
         direction,
         lab,
+        trades,
         league,
         notebook,
         guide,
@@ -225,14 +231,17 @@ async function render() {
   }
 }
 async function home() {
-  const h = await api("/api/office/home");
+  const [h, moves] = await Promise.all([
+    api("/api/office/home"),
+    api("/api/office/moves").catch((e) => ({ error: e.message })),
+  ]);
   return (
     head(
       "Your club. Your next move.",
       "The shape of your roster, and the decisions worth your attention.",
       "BOSTON • " + date(S.status.snapshot.game_date),
     ) +
-    `<div class="twocol"><div><article class="lead"><span class="eyebrow">THE DEPARTMENT’S READ</span><h2>${esc(h.summary)}</h2><p>${esc(h.blueprint.goal)}</p><div class="actions"><button data-nav="roster" class="primary">Build the best team today</button><button data-nav="lab">Open a decision</button></div></article><div class="metrics">${h.outlook.map((x) => metric(x.name, fmt(x.grade, 1) + "/10", x.count + " healthy selected players")).join("")}${metric("Health flags", h.briefing.injured, "Across the organization")}</div><div class="columns">${panel("The starting five", rotation(h.roster), badge("Preference grades"))}${panel("On the field", diamond(h.roster.lineup), '<button data-nav="roster">Roster lab →</button>')}</div>${panel(
+    `<div class="twocol"><div>${gmMoves(moves, h)}<div class="metrics">${h.outlook.map((x) => metric(x.name, fmt(x.grade, 1) + "/10", x.count + " healthy selected players")).join("")}${metric("Health flags", h.briefing.injured, "Across the organization")}</div><div class="columns">${panel("The starting five", rotation(h.roster), badge("Preference grades"))}${panel("On the field", diamond(h.roster.lineup), '<button data-nav="roster">Roster lab →</button>')}</div>${panel(
       "Your attention list",
       h.briefing.items
         .slice(0, 3)

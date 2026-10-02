@@ -183,11 +183,14 @@ small {
 }
 nav {
   display: flex;
-  gap: 22px;
+  flex-wrap: wrap;
+  align-items: center;
+  column-gap: 22px;
   padding: 0 30px;
   background: white;
   border-bottom: 1px solid var(--line);
-  overflow-x: auto;
+  position: relative;
+  z-index: 20;
 }
 nav a {
   white-space: nowrap;
@@ -2200,4 +2203,118 @@ summary:focus-visible {
   cursor: pointer;
   font-weight: 600;
   padding: 10px 0;
+}
+
+/* Assistant GM moves on the Clubhouse */
+.gm-moves h2 {
+  margin-bottom: 4px;
+}
+.gm-goal {
+  color: var(--muted);
+  margin-top: 0;
+}
+.move-card {
+  --call: var(--gold);
+  border: 1px solid var(--line);
+  border-left: 5px solid var(--call);
+  background: white;
+  padding: 12px 14px;
+  margin: 12px 0;
+}
+.move-go {
+  --call: var(--green);
+}
+.move-ready {
+  --call: var(--blue);
+}
+.call-chip.call-ready {
+  --call: var(--blue);
+}
+.move-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+}
+.move-head h3 {
+  margin: 0;
+  font-size: 18px;
+}
+.move-gain {
+  color: var(--green);
+  font-weight: 600;
+  font-size: 13px;
+}
+.move-chain {
+  margin: 6px 0 10px;
+  padding-left: 22px;
+}
+.move-chain li {
+  margin-bottom: 4px;
+}
+.move-card td small,
+.move-depth small {
+  display: block;
+  color: var(--muted);
+}
+.move-depth ul {
+  padding-left: 18px;
+}
+.move-depth li {
+  margin-bottom: 8px;
+}
+
+/* "More" menu in the nav */
+.nav-more {
+  position: relative;
+}
+.nav-more > summary {
+  list-style: none;
+  cursor: pointer;
+  padding: 14px 0;
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 600;
+  border-bottom: 3px solid transparent;
+  white-space: nowrap;
+}
+.nav-more > summary::-webkit-details-marker {
+  display: none;
+}
+.nav-more > summary::after {
+  content: " ▾";
+}
+.nav-more > summary.active {
+  color: var(--navy);
+  border-color: var(--red);
+}
+.nav-menu {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  min-width: 210px;
+  background: white;
+  border: 1px solid var(--line);
+  box-shadow: 0 8px 24px rgba(17, 36, 60, 0.12);
+  padding: 6px 0;
+}
+.nav-menu a {
+  display: block;
+  padding: 9px 16px;
+  border: 0;
+}
+.nav-menu a.active {
+  color: var(--navy);
+  background: var(--paper);
+}
+/* Trades page tabs */
+.trade-tabs {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 14px;
+}
+.trade-tabs button.active {
+  background: var(--navy);
+  color: white;
+  border-color: var(--navy);
 }

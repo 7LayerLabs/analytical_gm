@@ -297,6 +297,8 @@ def scouting_line(p, person, role, ours, v):
             if days
             else "hurt right now"
         )
+    elif p.get("day_to_day"):
+        extras.append("day-to-day")
     sentence = f"{label} ({hand}): {stats}" if hand else f"{label}: {stats}"
     if extras:
         sentence += "; " + "; ".join(extras)

@@ -36,25 +36,53 @@ const labQuestions = [
     detail: "Find pieces we can move while protecting next season.",
   },
 ];
+const TRADE_TYPES = ["Trade", "Offers"];
+const isTradeCase = (x) => TRADE_TYPES.includes(x.report?.type) || !!x.report?.trade_review;
+// Decisions: every question except trades, which have their own page.
 lab = async function () {
+  if (TRADE_TYPES.includes(S.labType)) S.labType = null;
   const choice = labQuestions.find((x) => x.type === S.labType),
-    mode = S.office.state.blueprint.seasons[S.status.snapshot.season];
+    questions = labQuestions.filter((x) => !TRADE_TYPES.includes(x.type));
+  return (
+    head(
+      "What are we deciding?",
+      "Pick a question. Your assistant GM makes the call; the numbers are one click down.",
+      "DECISIONS",
+    ) +
+    `<div class="twocol"><div>${choice ? panel(choice.title, `<button type="button" id="change-case-question" class="change-question">Choose a different question</button>${simpleCaseForm(choice, labMode())}`) : `<div class="case-questions">${questions.map((x) => `<button type="button" data-lab-type="${x.type}"><strong>${x.title}</strong><span>${x.detail}</span></button>`).join("")}<button type="button" data-nav="trades"><strong>Trades →</strong><span>Check a deal or compare offers on the Trades page.</span></button></div>`}<div id="case-report"></div></div>${labAside((x) => !isTradeCase(x))}</div>`
+  );
+};
+// Trades: one deal, or several offers for the same player(s).
+async function trades() {
+  if (!TRADE_TYPES.includes(S.labType)) S.labType = "Trade";
+  const choice = labQuestions.find((x) => x.type === S.labType);
+  const tabs = TRADE_TYPES.map(
+    (t) =>
+      `<button type="button" data-lab-type="${t}" class="${t === S.labType ? "active" : ""}">${t === "Trade" ? "One trade" : "Compare offers"}</button>`,
+  ).join("");
+  return (
+    head(
+      "Trade analyzer.",
+      "Check one deal, or line up the offers you've received and pick one.",
+      "TRADES",
+    ) +
+    `<div class="twocol"><div><div class="trade-tabs" role="tablist">${tabs}</div>${panel(choice.title, simpleCaseForm(choice, labMode()))}<div id="case-report"></div></div>${labAside(isTradeCase)}</div>`
+  );
+}
+function labMode() {
+  return S.office.state.blueprint.seasons[S.status.snapshot.season];
+}
+function labAside(keep) {
   const saved = S.office.state.decisions
+    .filter(keep)
     .slice(0, 10)
     .map(
       (x) =>
         `<div class="feeditem"><button data-open-case="${esc(x.id)}">${esc(x.report.question)}</button><small>${date(x.game_date)} · ${esc(x.status)}</small><select data-case-status="${esc(x.id)}" aria-label="Case status">${options(["Exploring", "Chosen", "Applied in OOTP", "Revisit"], x.status)}</select></div>`,
     )
     .join("");
-  return (
-    head(
-      "What are we deciding?",
-      "Start with a question. The department brings the evidence and alternatives.",
-      "DECISION LAB",
-    ) +
-    `<div class="twocol"><div>${choice ? panel(choice.title, `<button type="button" id="change-case-question" class="change-question">Choose a different question</button>${simpleCaseForm(choice, mode)}`) : `<div class="case-questions">${labQuestions.map((x) => `<button type="button" data-lab-type="${x.type}"><strong>${x.title}</strong><span>${x.detail}</span></button>`).join("")}</div>`}<div id="case-report"></div></div><aside>${panel("Our plan", `<h2>${esc(mode)}</h2><p>Next season: ${esc(S.office.state.blueprint.seasons[Number(S.status.snapshot.season) + 1])}</p><small>Saved player locks apply to every comparison.</small><details><summary>See standing locks</summary>${lockList()}</details>`)}${panel("Saved cases", saved || empty("Save a review to return to it here."))}</aside></div>`
-  );
-};
+  return `<aside>${panel("Our plan", `<h2>${esc(labMode())}</h2><p>Next season: ${esc(S.office.state.blueprint.seasons[Number(S.status.snapshot.season) + 1])}</p><small>Saved player locks apply to every comparison.</small><details><summary>See standing locks</summary>${lockList()}</details>`)}${panel("Saved cases", saved || empty("Save a review to return to it here."))}</aside>`;
+}
 function simpleCaseForm(choice, mode) {
   const kind = choice.type,
     trade = kind === "Trade",
@@ -88,7 +116,7 @@ function buttonLabel(kind) {
 const bindBeforeSimpleLab = bindPage;
 bindPage = function () {
   bindBeforeSimpleLab();
-  if (S.page !== "lab") return;
+  if (!["lab", "trades"].includes(S.page)) return;
   $$("[data-lab-type]").forEach(
     (b) =>
       (b.onclick = () => {
