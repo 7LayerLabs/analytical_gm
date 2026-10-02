@@ -161,7 +161,10 @@ class Department:
                 "organization_id": p.get("organization_id"),
                 "bats": {1: "R", 2: "L", 3: "S"}.get(p.get("bats"), "?"),
                 "throws": {1: "R", 2: "L"}.get(p.get("throws"), "?"),
-                "injured": bool(p.get("injury_is_injured")),
+                # Day-to-day players still play in OOTP (they stay in the rotation/lineup), so they
+                # are not "injured" for roster purposes; they're flagged separately.
+                "injured": bool(p.get("injury_is_injured")) and not p.get("injury_dtd_injury"),
+                "day_to_day": bool(p.get("injury_is_injured")) and bool(p.get("injury_dtd_injury")),
                 "injury_days": p.get("injury_left"),
                 "free_agent": bool(p.get("free_agent")),
                 "draft_eligible": bool(p.get("draft_eligible")),
