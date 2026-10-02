@@ -57,8 +57,9 @@ Draft steps (order and details to agree with Derek):
 - [x] D1 Trade calls (trade_call.py, web/trade.js): call + strength, We give/We get dollar ledger, pros/cons naming players, who's in/out of lineup/rotation/bullpen, what would make it work (names real players on their side). Win-now premium by club direction. Analytics review folded under "See the numbers". Live since 2026-10-01.
 - [x] D2 Value engine (value.py): dollars a player is worth to us over the years we control him. Calibrated per export from the save: rating->WAR lines (corr .80 bat / .76 SP / .65 RP), $/WAR from veteran deals ($6.8M), delta-method aging, development-to-potential by age; real MLB results blended in (2 seasons = half weight); two-way players add pitching; prospects valued as develop/stall mixture by level. 10 tests.
   - Known: mega-deals (Soto, Vlad) read deeply negative; partly real (ages 34-37), partly this league's $6.8M/win. Team/player options treated as scheduled years for now.
-- [ ] D3 Same treatment for signings (sign at <= $X for <= N years / pass), extensions, promotions
-- [ ] D4 Strip repeated boilerplate checks; one global "make moves in OOTP" footnote
+- [x] D3 Signings, extensions, call-ups (player_calls.py): same call scale + card; job read names the incumbent (take the job / split time / sit); extension separates already-controlled years from free-agent years and says "no need" when nothing is added. Live 2026-10-01.
+- [ ] D3b Replacement (injury cover) and deadline-plan questions still use the old department read
+- [ ] D4 Assistant-GM voice everywhere else: Clubhouse read -> "your top moves this week" (biggest hole + best fix by name/dollars), player reports lead with value line + keep/trade/extend call, Find help ranked by value per dollar, button copy ("Get the department's read"), strip repeated boilerplate checks
 - [ ] D5 Theo Scout fold-in (only the parts that earn their place): identity weights that change rankings, hunt list, exit-velo/barrel data; one identity set, not two
 
 ### Theo Scout overlap (2026-10-01)
