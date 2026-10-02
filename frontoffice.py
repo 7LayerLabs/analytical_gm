@@ -1667,9 +1667,14 @@ def evaluate(d, case):
         package = d.scenario(send, recv)
         base["package"] = package
         from trade_review import analyze_trade
+        from trade_call import trade_call
 
         base["trade_review"] = analyze_trade(o, send, recv, mode)
-        base["recommendation"] = base["trade_review"]["verdict"]
+        base["call"] = trade_call(o, send, recv, mode, base["trade_review"])
+        call = base["call"]
+        base["recommendation"] = (
+            call["call"] + (" " if call["call"].endswith("...") else ". ") + call["headline"]
+        )
         outgoing = [o.card(d.by_id[i]) for i in send]
         incoming = [o.card(d.by_id[i]) for i in recv]
         base["outgoing"] = outgoing
@@ -1806,7 +1811,7 @@ def evaluate(d, case):
         "Preferences combine current ratings, conservative completed-season MLB forecasts and schedule-weighted park fit. They guide a review; they do not certify a move’s legality or predict trade acceptance."
     )
     if kind == "Trade":
-        base["why"] = base["trade_review"]["lead"]
+        base["why"] = base["recommendation"]
     base["financial_context"] = {
         "reported_cash_trades_available": d.financials[d.team].get("cash_trades_available"),
         "current_payroll": d.financials[d.team].get("player_payroll"),

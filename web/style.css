@@ -2031,3 +2031,118 @@ summary:focus-visible {
     grid-template-columns: minmax(0, 1fr);
   }
 }
+
+/* Assistant GM trade call */
+.call-card {
+  --call: var(--gold);
+  border-left: 6px solid var(--call);
+  padding: 18px 22px 16px;
+}
+.call-go {
+  --call: var(--green);
+}
+.call-no {
+  --call: var(--red);
+}
+.call-stop {
+  --call: #7a1e2a;
+}
+.call-word {
+  font-family: var(--headline);
+  font-size: 46px;
+  line-height: 1;
+  margin: 6px 0 8px;
+  color: var(--call);
+  text-transform: uppercase;
+}
+.call-word small {
+  font-family: "Segoe UI", Arial, sans-serif;
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: none;
+  vertical-align: middle;
+  margin-left: 8px;
+  padding: 3px 8px;
+  border: 1px solid var(--call);
+  border-radius: 999px;
+}
+.call-headline {
+  font-size: 19px;
+  font-weight: 600;
+  margin: 0 0 16px;
+}
+.ledger,
+.procon {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 14px;
+  margin-bottom: 14px;
+}
+.ledger-side {
+  background: var(--paper);
+  border: 1px solid var(--line);
+  padding: 12px 14px;
+}
+.ledger-side strong {
+  display: block;
+  font-family: var(--headline);
+  font-size: 34px;
+  margin: 2px 0 6px;
+}
+.ledger-side ul,
+.procon ul,
+.call-roster ul {
+  margin: 0;
+  padding-left: 18px;
+}
+.ledger-side ul {
+  list-style: none;
+  padding: 0;
+}
+.ledger-side li {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 3px 0;
+}
+.procon h3,
+.call-roster h3 {
+  font-size: 14px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--muted);
+  margin: 0 0 6px;
+}
+.procon li,
+.call-roster li {
+  margin-bottom: 6px;
+}
+.make-it-work {
+  background: var(--paper);
+  border-left: 3px solid var(--call);
+  padding: 10px 12px;
+  margin: 4px 0 12px;
+}
+.call-foot {
+  color: var(--muted);
+}
+.see-numbers > summary {
+  cursor: pointer;
+  font-weight: 600;
+  color: var(--blue);
+  padding: 6px 0 14px;
+}
+@media (max-width: 640px) {
+  .ledger,
+  .procon {
+    grid-template-columns: 1fr;
+  }
+  .call-word {
+    font-size: 38px;
+  }
+}
+.ledger-side small {
+  display: block;
+  color: var(--muted);
+  margin: -2px 0 6px;
+}

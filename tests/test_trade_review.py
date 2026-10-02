@@ -79,7 +79,10 @@ class TradeReviewLive(unittest.TestCase):
             },
         )
         t = r["trade_review"]
-        self.assertEqual(r["recommendation"], "Decline this trade")
+        # The assistant GM's call leads; the analytics department still declines underneath.
+        self.assertIn(r["call"]["call"], ["Don't", "Hang up"])
+        self.assertTrue(r["recommendation"].startswith(r["call"]["call"]))
+        self.assertEqual(t["verdict"], "Decline this trade")
         self.assertIn("Keep Roman Anthony", t["lead"])
         self.assertEqual(len(t["comparisons"]), 2)
         self.assertTrue(

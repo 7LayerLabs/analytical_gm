@@ -23,7 +23,7 @@ FALLBACK_DOLLARS_PER_WAR = 7_000_000
 # several seasons of exports to measure them; MLB means a young big leaguer still developing.
 DEVELOPS = {1: 0.85, 2: 0.75, 3: 0.6, 4: 0.45, 6: 0.3}
 DEVELOPS_OTHER = 0.25
-ARBITRATION_SHARE = {3: 0.4, 4: 0.6, 5: 0.8}  # share of market value paid in arb years
+FALLBACK_ARBITRATION = {3: 0.12, 4: 0.26, 5: 0.36}  # share of market value; 2026 MLB save
 DEBUT_WAR = 1.0  # a minor leaguer is projected into the majors once he'd be worth this
 
 _CACHE = {}
@@ -119,6 +119,7 @@ class ValueEngine:
             self.league_min = min(mins) if mins else 740_000
             self.recent = self._recent_stats(con)
             self.dollars_per_war = self._price_of_a_win(con)
+            self.arbitration = self._arbitration_shares(con)
         finally:
             con.close()
 
@@ -218,6 +219,28 @@ class ValueEngine:
             rate += s.get("pit_war", 0) / seasons_seen
         return rate
 
+    def _arbitration_shares(self, con):
+        """What arbitration actually pays here: salary as a share of market value, by service year."""
+        rows = records(
+            con,
+            "select c.player_id, c.salary0, r.mlb_service_years svc from players_contract c"
+            " join players_roster_status r using(player_id) join players p using(player_id)"
+            " where p.league_id=? and c.years=1 and r.mlb_service_years between 3 and 5",
+            [self.d.league],
+        )
+        shares = {}
+        for r in rows:
+            p = self.d.by_id.get(r["player_id"])
+            war = self.current_rate(p) if p else 0
+            if war >= 1.0 and number(r["salary0"]) > self.league_min * 1.05:
+                shares.setdefault(int(r["svc"]), []).append(
+                    number(r["salary0"]) / (war * self.dollars_per_war)
+                )
+        return {
+            year: statistics.median(shares[year]) if len(shares.get(year, [])) >= 10 else fallback
+            for year, fallback in FALLBACK_ARBITRATION.items()
+        }
+
     def _price_of_a_win(self, con):
         """Median salary per projected win among veterans signed to multi-year deals."""
         vets = records(
@@ -305,12 +328,14 @@ class ValueEngine:
             elif not mlb:
                 salary, status = 0.0, "minors"
             else:
-                share = ARBITRATION_SHARE.get(years_in)
+                share = self.arbitration.get(years_in)
                 if share:
-                    full = max(0.0, rate) * self.dollars_per_war
+                    full = full_war * self.dollars_per_war
                     salary, status = max(self.league_min, share * full), "arbitration (est.)"
                 else:
                     salary, status = self.league_min, "pre-arbitration"
+                if full_war * self.dollars_per_war < salary:
+                    break  # not guaranteed and not worth it: we'd non-tender or release him
             full_salary = salary
             if i == 0:
                 salary *= self.season_left
@@ -385,6 +410,8 @@ class ValueEngine:
 
     def summary(self, p, v, mlb_seasons):
         """One plain-English line, the way an assistant GM would say it."""
+        if not v["seasons"]:
+            return "Replaceable. He doesn't project to be worth a big-league salary, so he carries no trade value."
         money = dollars(v["value"])
         through = v["control_through"]
         wins = f"{v['peak_war']:.1f}-win"
