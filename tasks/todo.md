@@ -11,16 +11,14 @@ analytics live one click down under "See the numbers". Claude owns the project (
 strong or lean) for trades, signings, extensions and call-ups, plus a "Compare trade offers" question.
 All built on a dollar-value engine calibrated from the save on every export. The Clubhouse leads with
 the assistant GM's suggested moves (chains + comparisons with league-ranked stat lines). Nav: Clubhouse,
-Trades, Decisions, Roster, Scouting, Find help, Farm, More. 165 tests pass.
+Trades, Decisions, Roster, Scouting, Find help, Farm, More. 171 tests pass.
 
 ### What's left, in order
 1. **Baseball pros/cons for signings, extensions, call-ups** (D1d). Trades already talk baseball (role,
    stat line, best tool, injury, contract). Signing/extension/call-up cards still lean on
    "projects around X wins". Reuse `trade_call.scouting_line` + the analytics review's `people` data.
-2. **Jev (TypeSafe) in the assistant GM** — PLAN WITH DEREK (spends TypeSafe credits; key is already set in
-   TYPESAFE_API_KEY). Proposed: (a) "Is it real?" read on hot minor leaguers in Clubhouse moves (results vs
-   ratings, e.g. Tolle), (b) a second opinion badge on trade calls (agrees / disagrees + confidence),
-   on-demand buttons, cached per export. Existing hook: jev.review() on player reports.
+2. **DONE 2026-10-02: Scout & fit + Ask Jev** (ffa50b4). Next for Jev: watch how often he disagrees with the
+   assistant GM's trade calls and on which kind of deal; that's where the value engine may need tuning.
 2b. **Moves engine next steps:** biggest-hole fixes from outside (free agents / trade targets by name and
    dollars), not just internal call-ups; use the blueprint identity to weight suggestions.
 3. **Player reports lead with the assistant GM** (D4). Value line from `value.py` + a keep / trade /
@@ -116,6 +114,9 @@ the current ones Derek likes; order trades → signings/extensions/promotions �
   from the rotation and Story from SS.
 - [x] Clubhouse assistant-GM moves + nav cleanup + Trades page (1e1d0a8). Full UI audit: 15 pages, 0 errors,
   0 failed requests; More menu, Trades tabs, all Decisions questions, player reports, older exports work.
+- [x] Gasper fix (6fdafb0): minor-league-deal veterans aren't "ours for 12 years"; zero-value depth is never a
+  reason to trade; anyone who plays for us is a "We lose" con; "Sheds X's contract" only for real overpays.
+- [x] Scout & fit, Ask Jev, value math on trade cards (ffa50b4).
 - [ ] D1d, D3b, D4 (player reports, Find help), D5 — see "What's left" above
 
 ## Review
