@@ -48,6 +48,9 @@ class Handler(BaseHTTPRequestHandler):
                         pid=int(param('id'));p=d.by_id.get(pid)
                         if not p:raise ValueError('Player unavailable in this export.')
                         return self.send(ReadinessDesk(d,int(param('team') or organization(d,p))).review(pid,param('position') or None,param('hand','vsr')))
+                    if route=='direction':
+                        from organizational_direction import organizational_direction
+                        return self.send(organizational_direction(o))
                     if route=='home':return self.send(o.home())
                     if route=='players':
                         ps=o.candidates(param('scope','organization'),param('q'),param('kind'),param('position'));sort=param('sort','grade')
@@ -88,7 +91,7 @@ class Handler(BaseHTTPRequestHandler):
                     for p in d.own():writer.writerow({k:(' '+str(p[k]) if isinstance(p.get(k),str) and p[k].startswith(('=','+','-','@')) else p.get(k)) for k in fields})
                     return self.send(buf.getvalue(),content_type='text/csv; charset=utf-8')
                 return self.send({'error':'Unknown report.'},404)
-            assets={'/':'index.html','/app.js':'app.js','/style.css':'style.css','/report.js':'report.js','/lab.js':'lab.js','/home.js':'home.js','/playstyle.js':'playstyle.js','/readiness.js':'readiness.js','/pitching.js':'pitching.js','/acquisition.js':'acquisition.js'}
+            assets={'/':'index.html','/app.js':'app.js','/style.css':'style.css','/report.js':'report.js','/lab.js':'lab.js','/home.js':'home.js','/playstyle.js':'playstyle.js','/readiness.js':'readiness.js','/pitching.js':'pitching.js','/acquisition.js':'acquisition.js','/direction.js':'direction.js'}
             if path not in assets:return self.send({'error':'Not found'},404)
             file=ROOT/'web'/assets[path];typ={'html':'text/html','js':'text/javascript','css':'text/css'}[file.suffix[1:]]
             self.send(file.read_bytes(),content_type=typ+'; charset=utf-8')
