@@ -293,8 +293,10 @@ class Office:
             if l['scope']=='roster' and l['player_id'] not in selectedids and any(p['id']==l['player_id'] for p in pool):warnings.append(f"Roster lock for {l['name']} exceeds available role places. Resolve the conflict; lock remains binding.")
         for l in locks:
             if l['scope']=='roster' and not any(p['id']==l['player_id'] for p in pool):warnings.append(f"Roster lock for {l['name']} requires an assignment or health review; retained as a required roster constraint.")
+        from pitching_roles import pitching_recommendations
+        pitching= pitching_recommendations(self,rotation,bullpen)
         grades=[x['player']['grade'] if x['player'] else 0 for x in rotation];shape='Top-heavy rotation' if sum(grades[:2])/2-sum(grades[2:])/3>=1.5 else 'Uneven rotation coverage' if 0 in grades else 'Balanced rotation profile'
-        return {'lineup':lineup,'rotation':rotation,'bullpen':bullpen,'bench':[self.card(p) for p in bench],'selected_count':len(selectedids),'warnings':warnings,'ready_for_review':not warnings,'shape':shape,'internal':internal,'hand':hand,'unfilled':[v for v in ['C','1B','2B','3B','SS','LF','CF','RF','DH'] if v not in placements],'depth':d.depth(),'method':'Global position assignment maximizes platoon skill preference plus speed and position defense. Position rating ≥4; explicit locks first. Five starters, up to eight relievers and four bench bats. This optimizes the stated heuristic, not simulated runs or legal roster moves.'}
+        return {'pitching_recommendations':pitching,'lineup':lineup,'rotation':rotation,'bullpen':bullpen,'bench':[self.card(p) for p in bench],'selected_count':len(selectedids),'warnings':warnings,'ready_for_review':not warnings,'shape':shape,'internal':internal,'hand':hand,'unfilled':[v for v in ['C','1B','2B','3B','SS','LF','CF','RF','DH'] if v not in placements],'depth':d.depth(),'method':'Global position assignment maximizes platoon skill preference plus speed and position defense. Position rating ≥4; explicit locks first. Five starters, up to eight relievers and four bench bats. This optimizes the stated heuristic, not simulated runs or legal roster moves.'}
 
     def benchmarks(self,year=None):
         d=self.d;year=int(year or d.year)
@@ -347,6 +349,8 @@ class Office:
         report=ScoutingReport(self)
         position=intended_position or ('SP' if self.role(p)=='Starters' else 'RP') if p['kind']=='pit' else intended_position or p['position']
         r['assessment']=report.assessment(p,position)
+        if p['kind']=='pit' and p in d.own():
+            plan=self.roster()['pitching_recommendations'];r['pitching_usage']=next((x for x in plan['rotation']+plan['bullpen'] if x['id']==p['id']),None)
         return r
 
     def contract_schedule(self,p):

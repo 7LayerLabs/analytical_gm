@@ -100,3 +100,9 @@ The team blueprint drafts How we play from selected How we build identities. The
 MLB readiness searches the Red Sox organization, any of the other 29 MLB organizations, or all organizations. Reviews separate current ability from future potential, show actual recent stats and league-relative performance, compare inferred MLB roles (including each rotation spot), and explain park/schedule fit, injuries, development, contract and roster/service considerations. Role, handedness, evidence and costs have separate views.
 
 Readiness verdicts use explicit screening thresholds and are not calibrated outcome probabilities. Minor-league stats are never presented as MLB equivalents. Other clubs use their own roster and park context; own-team locks remain binding. Exported service totals do not prove a safe Super Two date or move legality. Review the game before making roster moves.
+
+### Pitching roles and workload plan
+
+Roster Lab shows OOTP primary relief roles, usage recommendations, secondary Emergency SP coverage when supported, and an explained initial pitch cap for each starter. Selected pitchers' full scouting reports include the same plan. Fixed current-tool weights rank relief quality; stamina, repertoire, rated splits and historical MLB workload determine role eligibility and deployment. Established starting pitch history, prior innings and youth can lower the disclosed stamina-based cap. Missing stamina or throwing availability yields no usable cap.
+
+The plan flags long-relief coverage gaps and recent exported work/fatigue. Pitch caps are planning ceilings, not targets, clearance decisions or proven injury-prevention thresholds; verify spring/rehab buildup and today's rest. Analytics-led plans can recommend a Stopper; its exact inning/lead dropdown remains unverified because it was not shown in the supplied menus. Every recommendation remains an app suggestion, and GM locks retain their force. No game settings are changed.

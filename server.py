@@ -88,7 +88,7 @@ class Handler(BaseHTTPRequestHandler):
                     for p in d.own():writer.writerow({k:(' '+str(p[k]) if isinstance(p.get(k),str) and p[k].startswith(('=','+','-','@')) else p.get(k)) for k in fields})
                     return self.send(buf.getvalue(),content_type='text/csv; charset=utf-8')
                 return self.send({'error':'Unknown report.'},404)
-            assets={'/':'index.html','/app.js':'app.js','/style.css':'style.css','/report.js':'report.js','/lab.js':'lab.js','/home.js':'home.js','/playstyle.js':'playstyle.js','/readiness.js':'readiness.js'}
+            assets={'/':'index.html','/app.js':'app.js','/style.css':'style.css','/report.js':'report.js','/lab.js':'lab.js','/home.js':'home.js','/playstyle.js':'playstyle.js','/readiness.js':'readiness.js','/pitching.js':'pitching.js'}
             if path not in assets:return self.send({'error':'Not found'},404)
             file=ROOT/'web'/assets[path];typ={'html':'text/html','js':'text/javascript','css':'text/css'}[file.suffix[1:]]
             self.send(file.read_bytes(),content_type=typ+'; charset=utf-8')
