@@ -54,7 +54,7 @@ Evidence from the current app (snapshot 2026-07-01):
 - Anthony extension at $20M x 5 -> "No clear winner until cost and availability are confirmed."
 - Every case repeats the same two "verify in OOTP" checks.
 Draft steps (order and details to agree with Derek):
-- [ ] D1 Trade calls: one call (Do it / Do it if... / Don't / Hang up) + strength, pros/cons with numbers, "what would make it work", "will the AI accept"
+- [x] D1 Trade calls (trade_call.py, web/trade.js): call + strength, We give/We get dollar ledger, pros/cons naming players, who's in/out of lineup/rotation/bullpen, what would make it work (names real players on their side). Win-now premium by club direction. Analytics review folded under "See the numbers". Live since 2026-10-01.
 - [x] D2 Value engine (value.py): dollars a player is worth to us over the years we control him. Calibrated per export from the save: rating->WAR lines (corr .80 bat / .76 SP / .65 RP), $/WAR from veteran deals ($6.8M), delta-method aging, development-to-potential by age; real MLB results blended in (2 seasons = half weight); two-way players add pitching; prospects valued as develop/stall mixture by level. 10 tests.
   - Known: mega-deals (Soto, Vlad) read deeply negative; partly real (ages 34-37), partly this league's $6.8M/win. Team/player options treated as scheduled years for now.
 - [ ] D3 Same treatment for signings (sign at <= $X for <= N years / pass), extensions, promotions
@@ -66,9 +66,10 @@ Draft steps (order and details to agree with Derek):
 - Front Office: 10 identities, but the grade is mostly fixed (65% rating + 35% MLB rate + park fit), so identity barely changes who ranks high; README lists Statcast as unexported/unknown.
 - Overlapping pairs: Classic Moneyball~moneyball, Big Market~powerhouse, Tampa Farm~farm. Theo-only: New Moneyball/Process, Pitching Factory, Gloves & Contact, Platoon Engine, Durability Shop, Aging-Curve Pirate.
 
-### Phase 2: Storage hygiene
-- [ ] Retention: keep the latest N snapshots plus any snapshot a saved case or forecast references; allow pinning
-- [ ] Move `data/` out of OneDrive (e.g. `%LOCALAPPDATA%\OOTP-Analytics`, where the Jev key already lives), migrate existing data once
+### Phase 2: Storage hygiene (done 2026-10-01)
+- [x] Snapshots moved to %LOCALAPPDATA%\OOTP-Analytics\snapshots; state stays in data/ (OneDrive-backed). Newest 20 kept, raw CSV only on newest. data/ 2.5 GB -> 2.4 MB.
+- [x] Stale Sep 30 failed import moved to %LOCALAPPDATA%\OOTP-Analyticsailed-imports-2026-09-30 (safe to delete)
+- Saved cases store their own reports, so no pinning needed
 
 ### Phase 3: Prove the numbers
 - [ ] Forecast calibration: compare archived predictions against actual records as exports accumulate; show the error honestly on the Clubhouse card
