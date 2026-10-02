@@ -16,3 +16,5 @@
 .direction-window{display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin:18px 0}.direction-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:22px}.direction-grid .panel{margin-bottom:0}.direction-grid h3{margin-top:15px}.direction-grid .assessment{font-size:16px;line-height:1.65}.direction-meta small{display:block;margin-top:8px}.direction-grid details{margin:18px 0;font-size:14px}.direction-grid .actions{margin-bottom:0}.direction-grid .note{font-size:13px}@media(max-width:900px){.direction-grid{grid-template-columns:minmax(0,1fr)}}
 
 .owner-edit-row{border:1px solid var(--line);padding:16px;margin:18px 0}.owner-edit-row legend{font-weight:700;padding:0 6px}.owner-edit-row>label{display:grid;gap:6px;margin-bottom:12px}.owner-edit-row input,.owner-edit-row textarea{width:100%;box-sizing:border-box}
+
+.trade-lead{font-size:20px;line-height:1.5;max-width:850px}.trade-reasons li{margin:12px 0}.trade-player{border:1px solid var(--line);padding:18px}.trade-player h3 button{font:inherit;padding:0;border:0;color:var(--blue)}.trade-player details{font-size:14px;margin-top:14px}

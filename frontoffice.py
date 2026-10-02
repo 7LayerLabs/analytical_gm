@@ -493,6 +493,9 @@ def evaluate(d,case):
         send=[int(i) for i in case.get('send',[])];recv=[int(i) for i in case.get('receive',[])];blocked=protected.intersection(send)
         if blocked and not override:raise ValueError('A proposed outgoing player is trade-protected. Keep the lock or explicitly evaluate an unlocked scenario; standing locks remain unchanged.')
         package=d.scenario(send,recv);base['package']=package
+        from trade_review import analyze_trade
+        base['trade_review']=analyze_trade(o,send,recv,mode)
+        base['recommendation']=base['trade_review']['verdict']
         outgoing=[o.card(d.by_id[i]) for i in send];incoming=[o.card(d.by_id[i]) for i in recv];base['outgoing']=outgoing;base['incoming']=incoming
         base['alternatives'].append({'name':'Proposed package','summary':f"{len(outgoing)} outgoing / {len(incoming)} incoming. Current-year scheduled payroll changes by ${package['years'][0]['payroll_change']:,.0f}. Grades describe rate preferences, not additive trade value."})
         if blocked:base['checks'].append('Unlocked scenario only: standing trade protection is still saved and binding.')
@@ -522,6 +525,7 @@ def evaluate(d,case):
         if kind=='Signing' and p:
             base['player']=o.card(p);base['alternatives'].append({'name':'Sign selected player','player_id':pid,'summary':p['name']+' requires a confirmed asking price, role and roster place.'});base['offer_total']=assumptions['annual_offer']*assumptions['offer_years']
     base['why']='Preferences combine current ratings, conservative completed-season MLB forecasts and schedule-weighted park fit. They guide a review; they do not certify a move’s legality or predict trade acceptance.'
+    if kind=='Trade':base['why']=base['trade_review']['lead']
     base['financial_context']={'reported_cash_trades_available':d.financials[d.team].get('cash_trades_available'),'current_payroll':d.financials[d.team].get('player_payroll'),'manual_offer_total':assumptions['annual_offer']*assumptions['offer_years'],'note':'Exported funds require game-screen reconciliation. Manual offers do not imply player acceptance.'}
     if kind in ['Signing','Extension']:
         if not assumptions['annual_offer']:base['checks'].append('No offer amount supplied: financial comparison is incomplete; a zero is not a free acquisition.')

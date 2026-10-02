@@ -27,7 +27,7 @@ class OfficeTests(unittest.TestCase):
  def test_trade_protection_requires_explicit_scenario_override(self):
   save(self.d,{'action':'lock','player_id':26081,'scope':'trade'})
   with self.assertRaises(ValueError):evaluate(self.d,{'type':'Trade','send':[26081],'receive':[]})
-  r=evaluate(self.d,{'type':'Trade','send':[26081],'receive':[],'override':True});self.assertFalse(r['locks_respected']);self.assertEqual(len(office_state(self.d)['locks']),1)
+  r=evaluate(self.d,{'type':'Trade','send':[26081],'receive':[next(p['id'] for p in self.d.profiles if p['league_id']==self.d.league and p['organization_id']!=self.d.team and p['team_id']!=self.d.team)],'override':True});self.assertFalse(r['locks_respected']);self.assertEqual(len(office_state(self.d)['locks']),1)
  def test_injured_lock_is_visible_and_preserved(self):
   p=next(p for p in self.d.own() if p['injured'] and p['kind']=='bat')
   save(self.d,{'action':'lock','player_id':p['id'],'scope':'lineup','position':'DH'})
