@@ -40,6 +40,6 @@ else:
     ctypes.windll.user32.MessageBoxW(
         None,
         "The analytics department could not start. Check data/server-error.log in the OOTP-Assistant folder.",
-        "Fenway Front Office",
+        "OOTP Front Office",
         16,
     )

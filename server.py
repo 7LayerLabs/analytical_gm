@@ -22,6 +22,14 @@ from storage import (
     write_json,
     migrate_snapshots,
     prune,
+    active_team,
+    active_source,
+    choose_team,
+    choose_league,
+    league_status,
+    list_saves,
+    sync_team,
+    team_status,
 )
 
 JOURNAL_LOCK = threading.Lock()
@@ -79,10 +87,23 @@ class Handler(BaseHTTPRequestHandler):
                         "source": config(),
                         "jev": jev.status(),
                         "snapshots": snapshots(),
+                        "team": team_status(),
+                        "league": league_status(),
                     }
                 )
             if path == "/api/journal":
-                return self.send(read_json(DATA / "journal.json", []))
+                # Each league's notes stay with that league; notes from before leagues were
+                # separated show everywhere.
+                here = active_source()
+                return self.send(
+                    [
+                        x
+                        for x in read_json(DATA / "journal.json", [])
+                        if x.get("source") in (None, here)
+                    ]
+                )
+            if path == "/api/leagues":
+                return self.send(list_saves())
             if path.startswith("/api/"):
                 d = department(param("snapshot") or None)
                 if path == "/api/office":
@@ -319,6 +340,10 @@ class Handler(BaseHTTPRequestHandler):
             if path == "/api/import":
                 start_import()
                 return self.send({"message": "Checking for a completed export."})
+            if path == "/api/league":
+                return self.send(choose_league(str(body.get("csv_directory") or "")))
+            if path == "/api/team":
+                return self.send(choose_team(body.get("team_id"), bool(body.get("follow"))))
             if path == "/api/jev/setup":
                 return self.send(
                     jev.setup(
@@ -362,10 +387,12 @@ class Handler(BaseHTTPRequestHandler):
                             "created_at": datetime.now(timezone.utc).isoformat(),
                             "game_date": m["game_date"] if m else None,
                             "snapshot": m["id"] if m else None,
+                            "source": active_source(),
                         },
                     )
                     write_json(DATA / "journal.json", entries)
-                return self.send(entries)
+                here = active_source()
+                return self.send([x for x in entries if x.get("source") in (None, here)])
             return self.send({"error": "Unknown action."}, 404)
         except (ValueError, KeyError) as e:
             self.send({"error": str(e)}, 400)
@@ -375,13 +402,25 @@ class Handler(BaseHTTPRequestHandler):
 
 
 def archive_predictions():
-    # Every completed export gets a forecast, even while the GM is on another page.
+    # Every completed export gets a forecast, even while the GM is on another page. Forecasts are
+    # filed per club, so a new job gets its own archive.
     from season_projection import season_projection
 
     seen = set()
     while True:
+        try:
+            waiting = (team_status() or {}).get("needs_pick")
+        except Exception:
+            waiting = False
+        if waiting:  # a new league's stand-in club isn't his; wait until he picks one
+            time.sleep(5)
+            continue
         for snapshot in reversed(snapshots()):
-            if snapshot["id"] in seen:
+            try:
+                key = (snapshot["id"], active_team(snapshot))
+            except Exception:
+                continue  # a snapshot pruned mid-loop
+            if key in seen:
                 continue
             try:
                 season_projection(department(snapshot["id"]))
@@ -389,7 +428,7 @@ def archive_predictions():
                 pass  # Unsupported evidence remains visible on the clubhouse.
             except Exception:
                 traceback.print_exc()
-            seen.add(snapshot["id"])
+            seen.add(key)
         time.sleep(5)
 
 
@@ -402,6 +441,10 @@ def main():
     PORT = args.port
     migrate_snapshots()
     prune()
+    try:
+        sync_team()  # catch a job change in an export imported before this feature existed
+    except Exception:
+        traceback.print_exc()
     server = LocalHTTPServer(("127.0.0.1", PORT), Handler)
     threading.Thread(target=watcher, daemon=True).start()
     threading.Thread(target=archive_predictions, daemon=True).start()

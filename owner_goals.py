@@ -150,7 +150,7 @@ def capture_baseline(office):
     d = office.d
     earlier = [
         m
-        for m in snapshots()
+        for m in snapshots(d.manifest.get("source_id"))
         if str(m.get("game_date", "")).startswith(str(d.year)) and m.get("league_id") == d.league
     ]
     if earlier:

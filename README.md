@@ -1,6 +1,6 @@
-# Fenway Front Office
+# OOTP Front Office
 
-A local OOTP Baseball 27 analytics department, designed around a Boston Red Sox front office. The companion reads exports; it never advances the game or writes to the save.
+A local OOTP Baseball 27 analytics department for whichever MLB club you run. It started as a Boston Red Sox front office and follows you when you change jobs. The companion reads exports; it never advances the game or writes to the save.
 
 ## Set up and open
 
@@ -11,9 +11,30 @@ python -m pip install -r requirements.txt
 Copy-Item game-access.example.json game-access.json
 ```
 
-Edit `game-access.json`: set `csv_directory` to your OOTP save's `import_export/csv` folder, and use your save's actual `team_id` and `league_id`. Example IDs are placeholders; check `teams.csv` and `leagues.csv`. The interface currently uses Boston branding.
+Edit `game-access.json`: set `csv_directory` to your OOTP save's `import_export/csv` folder, and use your save's actual `team_id` and `league_id`. Example IDs are placeholders; check `teams.csv` and `leagues.csv`. After the first import the app reads your job from the export, so `team_id` only matters until then.
 
 Complete a full OOTP CSV export, then double-click **Start Front Office.cmd**. It opens http://127.0.0.1:8765. You can also run `python server.py --open` in a terminal. Click **Update Files** to import. With no export, the application displays setup guidance. Files stay on your computer. Python and dependencies must be installed before using the launcher.
+
+## Changing teams
+
+The front office works for one MLB club at a time, and the header shows which one: name, abbreviation, park. It changes two ways:
+
+- **It follows your OOTP job (on by default).** Every export includes OOTP's human-manager table. When it shows you running a different MLB club because you were fired, resigned or took a new job, the app switches to that club after the import and says so once on the dashboard. While you are between jobs, it stays with your last club.
+- **You pick a club yourself.** Click **Change team** next to the club name and choose any of the league's 30 clubs, grouped by division. Picking a club other than your OOTP job turns auto-follow off, so the next export does not pull you back. **Follow my OOTP job** in the same window turns it back on.
+
+No new export is needed to switch; every page rebuilds around the chosen club from the current snapshot, and older snapshots are viewed as that club too. Blueprints, locks, watchlists, saved decisions and season forecasts are filed per club, so switching back brings them back. The GM notebook is yours and comes with you.
+
+`game-access.json` records the choice as `team_id`, `human_team` and `follow_ootp`. In a save with several human managers, add `human_manager_id` (from `human_managers.csv`) so the app knows which one is you; without it, auto-follow keeps your current club.
+
+## Switching leagues
+
+Each OOTP save is its own league. Click **League** in the club bar to see every save in OOTP's `saved_games` folder (any OOTP version under Documents or OneDrive Documents), with your club, game date and whether it has an export yet. Pick one and the front office reads that save instead.
+
+- **A brand-new league** needs no ids typed in. Create it in OOTP, pick it here, then export CSVs from OOTP. The app imports it within about 20 seconds, finds the top league (fictional leagues use their own ids), and takes your club from OOTP's human-manager table. If OOTP doesn't say which club you run, it asks you to pick one.
+- **Going back** restores that league's club, follow setting, export history and plans. A newer export waiting in its folder is imported automatically.
+- **Nothing mixes.** Export history, the snapshot list, blueprints, locks, watchlists, saved decisions, season forecasts and player notes are all kept per league, so Boston in two different saves never shares locks on the wrong players. Each league keeps its own newest 20 exports.
+
+`game-access.json` holds the active league's settings at the top level and parks the others under `saves`. Add `saved_games_directory` if your saves live somewhere unusual.
 
 ## Player reports
 
@@ -27,7 +48,7 @@ Skills compare inferred regular starters at the intended position first, then al
 2. Click **Update Files**. The running companion also checks for completed stable exports every ten seconds.
 3. Verify the game date in the header. The snapshot selector lets you examine previous exports.
 
-Update Files reads existing CSVs; it does not make OOTP export. Failed imports preserve the prior valid snapshot. Each snapshot is a DuckDB database with file hashes, row counts and a manifest, stored outside OneDrive in `%LOCALAPPDATA%\OOTP-Analytics\snapshots` (override with `snapshot_directory` in `game-access.json`). The newest snapshot also keeps its raw CSV copy (about 300 MB); older ones keep only the database (about 110 MB), and only the newest 20 are kept. No unexported date has a synthetic rating history.
+Update Files reads existing CSVs; it does not make OOTP export. Failed imports preserve the prior valid snapshot. Each snapshot is a DuckDB database with file hashes, row counts and a manifest, stored outside OneDrive in `%LOCALAPPDATA%\OOTP-Analytics\snapshots` (override with `snapshot_directory` in `game-access.json`). Each league's newest snapshot also keeps its raw CSV copy (about 300 MB); older ones keep only the database (about 110 MB), and each league keeps its newest 20. No unexported date has a synthetic rating history.
 
 ## The redesigned department
 
@@ -69,7 +90,7 @@ An optional TypeSafe key can be remembered with Windows DPAPI under `%LOCALAPPDA
 
 ## Storage and verification
 
-`game-access.json` selects the source save, team and league. `data/frontoffice-team4-league203.json` stores blueprint versions, locks, watchlists, checkpoints and saved cases; `data/journal.json` stores notes. These small state files stay in `data/` beside the app; snapshots live in the local folder above. The app binds to 127.0.0.1 and rejects external origins for mutations. Credentials are not in these state files.
+`game-access.json` selects the source save, team and league. `data/frontoffice-<save>-team<id>-league<id>.json` stores blueprint versions, locks, watchlists, checkpoints and saved cases for one club in one save; `data/journal.json` stores notes, tagged by save. These small state files stay in `data/` beside the app; snapshots live in the local folder above. The app binds to 127.0.0.1 and rejects external origins for mutations. Credentials are not in these state files.
 
 Run `python -m unittest discover -s tests -q` for mathematical, import, contract and department checks. The redesign has also been checked in the browser at desktop and 390-pixel widths, including navigation, report tabs, league tabs, case evaluation/saving, and a live Jev review. Live-save integration tests run when a local imported snapshot exists; portable unit tests run without private exports.
 

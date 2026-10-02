@@ -1,6 +1,6 @@
 """Scout & fit: pick players from anywhere and get the assistant GM's scouting report on each,
 plus how he'd fit on our club: tools, this year's line with league rank, recent history, age and
-development, Fenway fit, whose job he'd take, what he'd cost and what he's worth to us.
+development, home-park fit, whose job he'd take, what he'd cost and what he's worth to us.
 """
 
 from analytics import number
@@ -119,8 +119,8 @@ class Scout:
             )
         return lines[:5]
 
-    def fenway(self, p):
-        """How his profile plays in our park, in plain words, from Fenway's own factors. The
+    def park_fit(self, p):
+        """How his profile plays in our park, in plain words, from our park's own factors. The
         verdict comes from the same notable tools the note cites."""
         h = self.home
         name = h.get("name") or "our park"
@@ -139,7 +139,7 @@ class Scout:
                 return {
                     "verdict": "plays down",
                     "note": f"Fringe movement ({int(movement)}/10) means fly-ball contact, and {name} adds "
-                    f"{doubles - 1:+.0%} doubles off the wall.",
+                    f"{doubles - 1:+.0%} doubles.",
                 }
             return {
                 "verdict": "neutral",
@@ -255,7 +255,7 @@ class Scout:
             raise ValueError("That player isn't in this export.")
         grid = self.tool_grid(p)
         fit = self.team_fit(p)
-        park = self.fenway(p)
+        park = self.park_fit(p)
         money = self.money(p)
         return {
             "id": p["id"],
@@ -271,7 +271,7 @@ class Scout:
             "this_year": self.m.line(p),
             "history": self.history(p),
             "development": self.development(p),
-            "fenway": park,
+            "park": {**park, "name": self.home.get("name") or "our park"},
             "fit": fit,
             "money": money,
             "wins": round(self.e.current_rate(p), 1),
@@ -292,7 +292,7 @@ class Scout:
         else:
             bits.append("would be depth for us")
         if park["verdict"] != "neutral":
-            bits.append(f"his game {park['verdict']} at Fenway")
+            bits.append(f"his game {park['verdict']} at {self.home.get('name') or 'our park'}")
         if money["label"] == "Trade value" and money["value"] > 0:
             bits.append(f"costs about {dollars(money['value'])} in trade value")
         elif money["label"] == "Free agent":

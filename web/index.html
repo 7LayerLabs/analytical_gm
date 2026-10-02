@@ -3,18 +3,26 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width,initial-scale=1" />
-    <title>Fenway Front Office</title>
+    <title>Front Office</title>
     <link rel="stylesheet" href="/style.css" />
   </head>
   <body>
     <header class="masthead">
       <a class="brand" href="#home"
-        ><span class="crest">B</span><span>FENWAY <b>FRONT OFFICE</b></span></a
+        ><span class="crest" id="crest">GM</span
+        ><span><span id="brand-name">YOUR</span> <b>FRONT OFFICE</b></span></a
       ><span class="mast-note">Your baseball department</span
       ><button id="refresh" class="primary">Update Files</button>
     </header>
     <div class="clubbar">
-      <div><b>Boston Red Sox</b><span id="game-date">Opening the department…</span></div>
+      <div class="clubline">
+        <b id="club-name">Your club</b
+        ><button id="team-button" class="teamswitch" type="button" aria-haspopup="dialog">
+          Change team</button
+        ><button id="league-button" class="teamswitch" type="button" aria-haspopup="dialog">
+          League</button
+        ><span id="game-date">Opening the department…</span>
+      </div>
       <select id="snapshot-select" aria-label="Export snapshot"></select>
     </div>
     <nav id="navigation" aria-label="Department">
@@ -44,6 +52,19 @@
         ><button id="close-player" aria-label="Close player report">✕</button>
       </div>
       <div id="player-content"></div>
+    </dialog>
+    <dialog id="league-dialog" aria-labelledby="league-title">
+      <div class="dialogbar">
+        <span>SWITCH LEAGUE</span
+        ><button id="close-league" aria-label="Close league picker">✕</button>
+      </div>
+      <div id="league-content"></div>
+    </dialog>
+    <dialog id="team-dialog" aria-labelledby="team-title">
+      <div class="dialogbar">
+        <span>CHANGE TEAMS</span><button id="close-team" aria-label="Close team picker">✕</button>
+      </div>
+      <div id="team-content"></div>
     </dialog>
     <script src="/app.js"></script>
     <script src="/report.js"></script>

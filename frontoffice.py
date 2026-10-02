@@ -1,6 +1,6 @@
 """Versioned GM preferences and evidence-based presentation. Never writes to OOTP."""
 
-import bisect, collections, math, secrets, threading
+import bisect, collections, math, os, secrets, threading
 from datetime import datetime, timezone
 from analytics import number, batting, pitching, POSITIONS
 from storage import DATA, connect, records, read_json, write_json, snapshots
@@ -188,7 +188,7 @@ GLOSSARY = [
     ),
     (
         "Gap power",
-        "OOTP ability associated with doubles/triples. Fenway’s exported factors favor both, but a 10 gap rating does not guarantee a specific extra-base total.",
+        "OOTP ability associated with doubles/triples. Your park’s exported factors show whether it favors them, but a 10 gap rating does not guarantee a specific extra-base total.",
     ),
     (
         "Contact",
@@ -318,7 +318,15 @@ def default_state(d):
 
 
 def state_path(d):
-    return DATA / f"frontoffice-team{d.team}-league{d.league}.json"
+    """Blueprint, locks, watchlist and saved decisions: one file per save and club, so Boston in
+    two different leagues never shares locks on the wrong players."""
+    source = d.manifest.get("source_id") or "save"
+    path = DATA / f"frontoffice-{source}-team{d.team}-league{d.league}.json"
+    legacy = DATA / f"frontoffice-team{d.team}-league{d.league}.json"
+    if not path.exists() and legacy.exists():
+        # Written before leagues were separated; it belongs to the first save that opens it.
+        os.replace(legacy, path)
+    return path
 
 
 def office_state(d):
@@ -1150,7 +1158,11 @@ class Office:
         r["promotion"] = self.promotion(p)
         r["contract_schedule"] = self.contract_schedule(p)
         history = []
-        available = [m for m in snapshots() if m["created_at"] <= d.manifest["created_at"]]
+        available = [
+            m
+            for m in snapshots(d.manifest.get("source_id"))
+            if m["created_at"] <= d.manifest["created_at"]
+        ]
         checkpoint_ids = {x["snapshot"] for x in self.state["checkpoints"]}
         recent_ids = {m["id"] for m in available[:12]}
         for m in [m for m in available if m["id"] in recent_ids or m["id"] in checkpoint_ids]:
@@ -1185,7 +1197,11 @@ class Office:
                 *x["case"].get("receive", []),
             ]
         ]
-        r["notes"] = [x for x in read_json(DATA / "journal.json", []) if x.get("player_id") == pid]
+        r["notes"] = [
+            x
+            for x in read_json(DATA / "journal.json", [])
+            if x.get("player_id") == pid and x.get("source") in (None, d.manifest.get("source_id"))
+        ]
         from scouting import ScoutingReport
 
         report = ScoutingReport(self)
@@ -1534,7 +1550,11 @@ class Office:
 
     def changes(self):
         d = self.d
-        prev = [m for m in snapshots() if m["created_at"] < d.manifest["created_at"]]
+        prev = [
+            m
+            for m in snapshots(d.manifest.get("source_id"))
+            if m["created_at"] < d.manifest["created_at"]
+        ]
         if not prev:
             return {
                 "previous": None,

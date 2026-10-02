@@ -134,7 +134,7 @@ def fit_questions():
             "type": "score",
             "instructions": {
                 "question": "How well does this player fit the club in `our_club`, given its needs, ballpark and direction?",
-                "focus": "Use `fit`, `fenway`, `money` and `our_club`.",
+                "focus": "Use `fit`, `park`, `money` and `our_club`.",
                 "rule": GUARD,
             },
             "criteria": [
@@ -436,7 +436,7 @@ def ask(office, topic, payload):
         report = Scout(office).report(int(payload["id"]))
         state = {"player": player_facts(report), "our_club": club_context(office)}
         if topic == "fit":
-            state.update(fit=report["fit"], fenway=report["fenway"], money=report["money"])
+            state.update(fit=report["fit"], park=report["park"], money=report["money"])
             questions = fit_questions()
         else:
             questions = prospect_questions(report["kind"])

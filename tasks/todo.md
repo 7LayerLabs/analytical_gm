@@ -1,4 +1,4 @@
-# Project: Fenway Front Office (repo: 7LayerLabs/analytical_gm)
+# Project: OOTP Front Office, formerly Fenway Front Office (repo: 7LayerLabs/analytical_gm)
 
 ## START HERE (last updated 2026-10-01)
 
@@ -12,6 +12,23 @@ strong or lean) for trades, signings, extensions and call-ups, plus a "Compare t
 All built on a dollar-value engine calibrated from the save on every export. The Clubhouse leads with
 the assistant GM's suggested moves (chains + comparisons with league-ranked stat lines). Nav: Clubhouse,
 Trades, Decisions, Roster, Scouting, Find help, Farm, More. 171 tests pass.
+
+**DONE 2026-10-02: change teams.** The app follows Derek's OOTP job (human_managers in the export):
+fired / resigned / hired elsewhere switches the club after the next import, with a one-time "new job"
+toast. "Change team" in the club bar picks any of the 30 MLB clubs (manual pick turns auto-follow off;
+"Follow my OOTP job" turns it back on). Department/value caches key on (snapshot, team); header, park
+names and "where" labels come from the chosen club. Per-club state files already existed. Tests:
+`tests/test_team_switch.py`. Two live-save tests (`Sonny Gray` contract, `Anthony for Goodman/Beck`)
+assume the mbltest save and fail on the abl save; they are not team-switch regressions.
+
+**DONE 2026-10-02: switch leagues.** "League" in the club bar lists every OOTP save (saved_games under
+Documents / OneDrive Documents, plus `saved_games_directory`). Switching parks the active save's settings
+under `saves` in game-access.json and restores the other's; a new save starts fresh (follow on, league and
+club detected at import: top level league via league_level/parent_league_id, club via human_managers, else
+the dashboard asks him to pick). Snapshots, current pointer (`current.json` -> `saves` map), pruning (20 per
+save), office state files, journal notes and forecasts are all per save (`source_id`). Empty leagues show
+export steps. write_json now retries when OneDrive briefly locks a file (it failed once in testing).
+Tests: `tests/test_leagues.py`.
 
 ### What's left, in order
 1. **Baseball pros/cons for signings, extensions, call-ups** (D1d). Trades already talk baseball (role,
@@ -42,7 +59,8 @@ Trades, Decisions, Roster, Scouting, Find help, Farm, More. 171 tests pass.
 - Price of a win: keep it calibrated from the save (~$6.8M, Claude's lean) or set it higher
   (real-MLB star deals run ~$8-9M per win; this is why Soto/Vlad mega-deals read so negative).
 - "Will the AI accept this trade?" prediction: parked until Derek decides.
-- Later: fold GM Portal ideas in; generalize beyond Boston (e.g. for the future online league).
+- Later: fold GM Portal ideas in. Generalizing beyond Boston is done (team picker + job follow); for the
+  online league, set `human_manager_id` in game-access.json so auto-follow knows which human is Derek.
 
 ### Known rough edges
 - Moves: "Worth a look" only fires when the ratings gap is within ~1 win/season (0.3 for relievers).

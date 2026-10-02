@@ -32,13 +32,14 @@ def arbitration_review_candidate(
 
 
 class Department:
-    def __init__(self, sid=None):
+    def __init__(self, sid=None, team=None):
         self.manifest = current() if sid is None else read_json(SNAPSHOTS / sid / "manifest.json")
         if not self.manifest:
             raise ValueError("No imported snapshot yet.")
         self.sid = self.manifest["id"]
         self.year = self.manifest["season"]
-        self.team = self.manifest["team_id"]
+        # The club we work for is the GM's current choice, not whoever he ran when this was exported.
+        self.team = int(team if team is not None else active_team(self.manifest))
         self.league = self.manifest["league_id"]
         with connect(self.sid) as con:
             self.teams = index(records(con, "select * from teams"), "team_id")
@@ -628,7 +629,7 @@ class Department:
         prospects.sort(key=lambda p: p["engine_potential"], reverse=True)
         previous = [
             m
-            for m in snapshots()
+            for m in snapshots(self.manifest.get("source_id"))
             if m["id"] != self.sid and m["created_at"] < self.manifest["created_at"]
         ]
         changes = []
@@ -772,9 +773,10 @@ def department(sid=None):
     m = current() if sid is None else read_json(SNAPSHOTS / sid / "manifest.json")
     if not m:
         raise ValueError("Import an export first.")
+    key = (m["id"], active_team(m))
     with MODEL_LOCK:
-        if m["id"] not in CACHE:
+        if key not in CACHE:
             if len(CACHE) >= 3:
                 CACHE.pop(next(iter(CACHE)))
-            CACHE[m["id"]] = Department(m["id"])
-        return CACHE[m["id"]]
+            CACHE[key] = Department(*key)
+        return CACHE[key]

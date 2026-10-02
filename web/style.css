@@ -154,7 +154,9 @@ small {
   text-align: center;
   line-height: 34px;
   border-radius: 50%;
-  font-family: Georgia, serif;
+  font-family: var(--headline);
+  font-size: 13px;
+  letter-spacing: 0.5px;
   font-weight: bold;
 }
 .mast-note {
@@ -175,11 +177,152 @@ small {
   gap: 12px;
 }
 .clubbar b {
-  margin-right: 18px;
+  margin-right: 10px;
 }
 .clubbar span {
   color: var(--muted);
   font-size: 13px;
+}
+.clubline {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  column-gap: 0;
+  row-gap: 4px;
+}
+.teamswitch {
+  font-size: 12px;
+  padding: 3px 10px;
+  margin-right: 18px;
+  color: var(--blue);
+  border-color: #c5d4e2;
+}
+.followcard {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+  padding: 20px 24px;
+  background: white;
+  border-bottom: 1px solid var(--line);
+}
+.followcard h2 {
+  margin: 0 0 6px;
+  font-family: var(--headline);
+  font-size: 28px;
+}
+.followcard p {
+  margin: 0;
+  max-width: 640px;
+}
+.followcard .primary,
+.followcard .badge {
+  flex: none;
+}
+.teamgrid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 18px 16px;
+  padding: 20px 24px 6px;
+}
+.teamgrid h3 {
+  margin: 0 0 8px;
+  font-size: 11px;
+  letter-spacing: 1.8px;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+.clubpick {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  margin-bottom: 6px;
+  padding: 7px 10px;
+  text-align: left;
+}
+.clubpick .chip {
+  flex: none;
+  width: 42px;
+  padding: 3px 0;
+  border-radius: 3px;
+  background: var(--navy);
+  color: white;
+  text-align: center;
+  font-family: var(--headline);
+  font-size: 14px;
+  letter-spacing: 0.5px;
+}
+.clubpick .clubtext {
+  flex: 1;
+  min-width: 0;
+}
+.clubpick strong,
+.clubpick small {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.clubpick strong {
+  font-size: 14px;
+}
+.clubpick.current {
+  border-color: var(--navy);
+  box-shadow: inset 3px 0 0 var(--red);
+  background: #f3f6f9;
+}
+.clubpick.current .chip {
+  background: var(--red);
+}
+.teamnote {
+  margin: 0;
+  padding: 10px 24px 22px;
+  color: var(--muted);
+  font-size: 13px;
+}
+#team-dialog {
+  width: min(900px, 95vw);
+}
+#league-dialog {
+  width: min(680px, 95vw);
+}
+.leaguelist {
+  padding: 18px 24px 4px;
+}
+.leaguepick {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  margin-bottom: 8px;
+  padding: 12px 14px;
+  text-align: left;
+}
+.leaguepick .clubtext {
+  flex: 1;
+  min-width: 0;
+}
+.leaguepick strong,
+.leaguepick small {
+  display: block;
+}
+.leaguepick strong {
+  font-family: var(--headline);
+  font-size: 20px;
+  letter-spacing: 0.3px;
+}
+.leaguepick.current {
+  border-color: var(--navy);
+  box-shadow: inset 3px 0 0 var(--red);
+  background: #f3f6f9;
+}
+.noexport .steps {
+  margin: 0 0 16px;
+  padding-left: 20px;
+}
+.noexport .steps li {
+  margin-bottom: 8px;
 }
 nav {
   display: flex;
@@ -944,6 +1087,24 @@ summary:focus-visible {
   }
   .clubbar select {
     max-width: 170px;
+  }
+  .clubbar .clubline span {
+    flex-basis: 100%;
+  }
+  .followcard {
+    flex-direction: column;
+    align-items: flex-start;
+    padding: 18px 16px;
+  }
+  .teamgrid {
+    grid-template-columns: 1fr;
+    padding: 16px 16px 6px;
+  }
+  .leaguelist {
+    padding: 14px 16px 4px;
+  }
+  .teamnote {
+    padding: 10px 16px 18px;
   }
   .twocol,
   .columns,

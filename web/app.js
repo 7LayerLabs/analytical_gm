@@ -41,6 +41,8 @@ let S = {
     generation: 0,
   },
   F = { scope: "organization", q: "", kind: "", sort: "grade", direction: "desc" };
+// The club this front office works for. It can change mid-save (fired, resigned, new job).
+const ourTeam = () => S.status?.team?.id ?? S.status?.snapshot?.team_id;
 async function api(path, params = {}, body) {
   const q = new URLSearchParams(params);
   if (S.snapshot && !body && !["/api/status", "/api/journal"].includes(path))
@@ -154,11 +156,21 @@ function payrollChart(ys) {
 }
 async function status() {
   const v = await api("/api/status"),
-    prev = S.status?.snapshot?.id;
+    hadStatus = !!S.status,
+    prev = S.status?.snapshot?.id,
+    prevTeam = S.status?.team?.id,
+    prevLeague = S.status?.league?.source,
+    leagueMoved = prevLeague != null && prevLeague !== v.league?.source;
+  if (leagueMoved) S.snapshot = ""; // the other league's exports aren't in this list
   S.status = v;
+  clubHeader(v.team);
+  $("#league-button").textContent = "League: " + (v.league?.name || "choose");
+  clearTimeout(S.fastPoll);
+  if (v.import.running) S.fastPoll = setTimeout(() => status().catch(() => {}), 3000);
   const m = S.snapshot ? v.snapshots.find((x) => x.id === S.snapshot) : v.snapshot;
-  $("#game-date").textContent =
-    date(m?.game_date) + " · " + (S.snapshot ? "Historical export" : "Latest export");
+  $("#game-date").textContent = m
+    ? date(m.game_date) + " · " + (S.snapshot ? "Historical export" : "Latest export")
+    : "No export yet";
   $("#snapshot-foot").textContent = m ? "Captured " + new Date(m.created_at).toLocaleString() : "";
   $("#snapshot-select").innerHTML =
     '<option value="">Latest export</option>' +
@@ -177,11 +189,202 @@ async function status() {
     (v.import.running
       ? v.import.message
       : "Historical view. Saved preferences and new decisions use the latest export.");
-  if (prev && prev !== v.snapshot?.id && !S.snapshot) {
+  if (leagueMoved) {
+    RD.team = null;
+    RD.player = null;
+    S.pickAsked = null;
+    $("#player-dialog").close();
+    $("#team-dialog").close();
+    toast(
+      `Now running ${v.league.name}.` +
+        (v.snapshot
+          ? ""
+          : v.import.running || v.league.has_export
+            ? " Importing its export now."
+            : " Export from OOTP and it loads on its own."),
+    );
+    render();
+  } else if (prevTeam != null && v.team && prevTeam !== v.team.id) {
+    // New club: drop anything picked for the old one and rebuild every page around the new one.
+    RD.team = null;
+    RD.player = null;
+    $("#player-dialog").close();
+    toast(newJob(v.team) || `The front office now works for the ${v.team.name}.`);
+    render();
+  } else if (prev && prev !== v.snapshot?.id && !S.snapshot) {
     toast("New export imported. Reports updated.");
     render();
+  } else if (hadStatus && !prev && v.snapshot) {
+    toast(`${v.league?.name || "Your league"} is loaded.`);
+    render();
+  } else if (prevTeam == null) {
+    const msg = newJob(v.team);
+    if (msg) toast(msg);
+  }
+  if (!v.snapshot && !S.snapshot && $("#content .noexport")) $("#content").innerHTML = noExport();
+  if (v.team?.needs_pick && v.snapshot && S.pickAsked !== v.snapshot.id) {
+    // A new save where OOTP doesn't say which club is his: ask once per export.
+    S.pickAsked = v.snapshot.id;
+    openTeams();
   }
 }
+function noExport() {
+  const l = S.status?.league || {},
+    name = l.name || "this league",
+    running = S.status?.import.running,
+    error = S.status?.import.error;
+  const body = running
+    ? `<p>The first import of a league takes about a minute. This page fills in by itself when it's done.</p>`
+    : l.has_export
+      ? `<p>${esc(error || "The export is here but hasn't been imported yet.")}</p><div class="actions"><button class="primary" data-update-files>Update Files</button> <button data-open-league>Switch league</button></div>`
+      : `<ol class="steps"><li>Open <b>${esc(name)}</b> in OOTP.</li><li>Go to Game Settings, Database, Database Tools, and choose <b>Export data to CSV files</b>.</li><li>Come back here. The front office picks up the export by itself within about 20 seconds, then works out the league and your club.</li></ol><div class="actions"><button data-open-league>Switch league</button></div>`;
+  return `<div class="noexport">${head(
+    running
+      ? "Bringing in your league."
+      : l.has_export
+        ? "Almost there."
+        : "Export this league from OOTP.",
+    running
+      ? `Importing ${name}.`
+      : l.has_export
+        ? `${name} has an export waiting.`
+        : `${name} doesn't have an export yet, so there's nothing to read.`,
+    name.toUpperCase(),
+  )}${panel(running ? "Importing" : "Next step", body)}</div>`;
+}
+function newJob(t) {
+  // Shown once per job change that OOTP reported, even if the app was closed when it happened.
+  const c = t?.change;
+  if (!c) return "";
+  try {
+    if (localStorage.getItem("ootp-job-change") === c.at) return "";
+    localStorage.setItem("ootp-job-change", c.at);
+  } catch {}
+  return `New job. OOTP shows you running the ${c.to_name} as of ${date(c.game_date)}, so the front office switched over.${c.from_name ? ` Your ${c.from_name} plans are saved if you ever go back.` : ""}`;
+}
+function clubHeader(t) {
+  if (!t || t.needs_pick) {
+    $("#club-name").textContent = t ? "Pick your club" : "No club yet";
+    $("#crest").textContent = "GM";
+    $("#brand-name").textContent = "YOUR";
+    document.title = "Front Office";
+    $("#team-button").hidden = !t;
+    return;
+  }
+  const nick = t.nickname || t.name;
+  $("#club-name").textContent = t.name;
+  $("#crest").textContent = t.abbr || t.name.slice(0, 1);
+  $("#brand-name").textContent = nick.toUpperCase();
+  document.title = nick + " Front Office";
+  $("#team-button").hidden = !t.clubs?.length;
+}
+function teamPicker() {
+  const t = S.status.team,
+    job = t.ootp_job,
+    groups = [...new Set(t.clubs.map((c) => c.division || "MLB"))],
+    mine = (c) => c.id === t.id && !t.needs_pick, // a stand-in club isn't his until he picks
+    why = t.needs_pick
+      ? `OOTP doesn't say which club you run in ${S.status.league?.name || "this league"}. Pick yours and every page builds around it.`
+      : t.follow
+        ? job
+          ? `OOTP shows you running the ${t.ootp_job_name}. If you get fired, resign or take another job, the front office follows you after your next export.`
+          : `OOTP doesn't show you with an MLB club right now. The front office stays with the ${t.name} until you land your next job, then follows you there.`
+        : `You picked the ${t.name} yourself, so the front office won't move when your OOTP job changes.${job ? ` OOTP shows you running the ${t.ootp_job_name}.` : ""}`;
+  return `<div class="followcard"><div><span class="eyebrow">${t.needs_pick ? "NEW LEAGUE" : t.follow ? "FOLLOWING YOUR OOTP JOB" : "PICKED BY YOU"}</span><h2 id="team-title">Who are you running?</h2><p>${esc(why)}</p></div>${t.follow ? badge("Auto-follow on", "green") : `<button type="button" class="primary" data-follow-ootp>Follow my OOTP job</button>`}</div><div class="teamgrid">${groups
+    .map(
+      (g) =>
+        `<section><h3>${esc(g)}</h3>${t.clubs
+          .filter((c) => (c.division || "MLB") === g)
+          .map(
+            (c) =>
+              `<button type="button" class="clubpick${mine(c) ? " current" : ""}" data-team="${c.id}"${mine(c) ? ' aria-current="true"' : ""}><span class="chip">${esc(c.abbr)}</span><span class="clubtext"><strong>${esc(c.name)}</strong><small>${esc(c.park || "")}</small></span>${mine(c) ? badge("Your club") : c.id === job ? badge("OOTP job", "gold") : ""}</button>`,
+          )
+          .join("")}</section>`,
+    )
+    .join(
+      "",
+    )}</div><p class="teamnote">Every club keeps its own blueprint, locks, watchlist, saved decisions and season forecasts, so switching back brings them all back. Your GM notebook comes with you. Picking a club other than your OOTP job turns auto-follow off.</p>`;
+}
+function openTeams() {
+  if (!S.status?.team) return;
+  $("#team-content").innerHTML = teamPicker();
+  if (!$("#team-dialog").open) $("#team-dialog").showModal();
+}
+$("#team-button").onclick = openTeams;
+async function openLeagues() {
+  $("#team-dialog").close();
+  $("#league-content").innerHTML = '<div class="loading">Looking for your OOTP saves…</div>';
+  if (!$("#league-dialog").open) $("#league-dialog").showModal();
+  try {
+    $("#league-content").innerHTML = leaguePicker(await api("/api/leagues"));
+  } catch (e) {
+    $("#league-content").innerHTML = `<div class="error"><p>${esc(e.message)}</p></div>`;
+  }
+}
+function leaguePicker(saves) {
+  const line = (s) =>
+    [
+      s.team ? "You: " + s.team : "",
+      s.game_date ? "Game date " + date(s.game_date) : "",
+      s.has_export ? "Exported " + new Date(s.exported_at).toLocaleDateString() : "No export yet",
+    ]
+      .filter(Boolean)
+      .join(" · ");
+  const folders = [...new Set(saves.map((s) => s.folder))];
+  return `<div class="followcard"><div><span class="eyebrow">YOUR OOTP SAVES</span><h2 id="league-title">Which league are you running?</h2><p>Each league keeps its own exports, club, plans, locks, forecasts and notes. Switch back any time and it picks up where you left off.</p></div></div><div class="leaguelist">${
+    saves
+      .map(
+        (s) =>
+          `<button type="button" class="leaguepick${s.active ? " current" : ""}" data-league="${esc(s.csv_directory)}"${s.active ? ' aria-current="true"' : ""}><span class="clubtext"><strong>${esc(s.name)}</strong><small>${esc(line(s))}</small></span>${s.active ? badge("Current league") : s.has_export ? "" : badge("Needs an export", "gold")}</button>`,
+      )
+      .join("") || empty("No OOTP saves found in your Documents folder.")
+  }</div><p class="teamnote">Starting a brand-new league? Create it in OOTP and it shows up here. Pick it, then export from OOTP (Game Settings, Database, Database Tools, Export data to CSV files). The front office imports it on its own and works out the league and your club.${folders.length ? " Reading saves from " + esc(folders.join(" and ")) + "." : ""}</p>`;
+}
+$("#league-button").onclick = openLeagues;
+$("#close-league").onclick = () => $("#league-dialog").close();
+$("#league-content").onclick = async (e) => {
+  const b = e.target.closest("button[data-league]");
+  if (!b) return;
+  if (b.classList.contains("current")) return $("#league-dialog").close();
+  $$("#league-content button").forEach((x) => (x.disabled = true));
+  try {
+    await api("/api/league", {}, { csv_directory: b.dataset.league });
+    $("#league-dialog").close();
+    await status();
+  } catch (x) {
+    toast(x.message);
+    $$("#league-content button").forEach((x) => (x.disabled = false));
+  }
+};
+document.addEventListener("click", (e) => {
+  const b = e.target.closest("button");
+  if (b?.matches("[data-open-league]")) openLeagues();
+  if (b?.matches("[data-update-files]")) $("#refresh").click();
+});
+$("#close-team").onclick = () => $("#team-dialog").close();
+$("#team-content").onclick = async (e) => {
+  const b = e.target.closest("button");
+  if (!b || (!b.dataset.team && !("followOotp" in b.dataset))) return;
+  if (Number(b.dataset.team) === S.status.team.id && !S.status.team.needs_pick)
+    return $("#team-dialog").close();
+  $$("#team-content button").forEach((x) => (x.disabled = true));
+  try {
+    await api(
+      "/api/team",
+      {},
+      b.dataset.team ? { team_id: Number(b.dataset.team) } : { follow: true },
+    );
+    $("#team-dialog").close();
+    await status();
+    if (!b.dataset.team)
+      toast(
+        `Auto-follow is back on. You're running the ${S.status.team.name}, and the front office follows your OOTP job from here.`,
+      );
+  } catch (x) {
+    toast(x.message);
+    $$("#team-content button").forEach((x) => (x.disabled = false));
+  }
+};
 async function render() {
   const gen = ++S.generation;
   S.page = location.hash.slice(1) || "home";
@@ -198,6 +401,10 @@ async function render() {
   if (more) {
     more.open = false;
     more.querySelector("summary").classList.toggle("active", !!more.querySelector("a.active"));
+  }
+  if (!S.status?.snapshot) {
+    $("#content").innerHTML = noExport();
+    return;
   }
   $("#content").innerHTML = '<div class="loading">Preparing your department’s report…</div>';
   try {
@@ -239,7 +446,9 @@ async function home() {
     head(
       "Your club. Your next move.",
       "The shape of your roster, and the decisions worth your attention.",
-      "BOSTON • " + date(S.status.snapshot.game_date),
+      (S.status.team?.short || "Your club").toUpperCase() +
+        " • " +
+        date(S.status.snapshot.game_date),
     ) +
     `<div class="twocol"><div>${gmMoves(moves, h)}<div class="metrics">${h.outlook.map((x) => metric(x.name, fmt(x.grade, 1) + "/10", x.count + " healthy selected players")).join("")}${metric("Health flags", h.briefing.injured, "Across the organization")}</div><div class="columns">${panel("The starting five", rotation(h.roster), badge("Preference grades"))}${panel("On the field", diamond(h.roster.lineup), '<button data-nav="roster">Roster lab →</button>')}</div>${panel(
       "Your attention list",
@@ -1339,10 +1548,7 @@ function packagePicker(side) {
       });
       if (gen !== generation) return;
       $(`#${side}-matches`).innerHTML = r.players
-        .filter(
-          (p) =>
-            side === "send" || side === "scout" || p.organization_id !== S.status.snapshot.team_id,
-        )
+        .filter((p) => side === "send" || side === "scout" || p.organization_id !== ourTeam())
         .map(
           (p) =>
             `<button type="button" data-package-player="${p.id}">${esc(p.name)} · ${esc(p.team)}</button>`,

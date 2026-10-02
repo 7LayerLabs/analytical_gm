@@ -112,7 +112,7 @@ class LiveScout(unittest.TestCase):
             self.assertTrue(r["verdict"])
             self.assertTrue(r["summary"])
             self.assertIn(
-                r["fenway"]["verdict"],
+                r["park"]["verdict"],
                 ["plays up", "plays down", "neutral", "mostly plays up", "mostly plays down"],
             )
             self.assertTrue(r["tools"])

@@ -3,7 +3,7 @@
 let RD = { team: null, q: "", minor: true, offset: 0, player: null, role: "", hand: "vsr" };
 
 async function readiness() {
-  if (RD.team === null) RD.team = S.status.snapshot.team_id;
+  if (RD.team === null) RD.team = ourTeam();
   const r = await api("/api/office/readiness-list", {
     team: RD.team,
     q: RD.q,

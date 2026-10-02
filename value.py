@@ -477,6 +477,8 @@ def dollars(amount):
 
 def value_engine(d):
     with _LOCK:
-        if d.sid not in _CACHE:
-            _CACHE[d.sid] = ValueEngine(d)
-        return _CACHE[d.sid]
+        # Per club too: the engine keeps its department and our games played.
+        key = (d.sid, d.team)
+        if key not in _CACHE:
+            _CACHE[key] = ValueEngine(d)
+        return _CACHE[key]

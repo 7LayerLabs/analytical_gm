@@ -84,7 +84,9 @@ class Moves:
     def where(self, p):
         level = self.e.level(p) or 1
         if level == 1:
-            return "Boston" if p["team_id"] == self.d.team else self.d.team_name(p["team_id"])
+            if p["team_id"] == self.d.team:
+                return str(self.d.teams.get(self.d.team, {}).get("name") or "Our club")
+            return self.d.team_name(p["team_id"])
         return f"{LEVELS.get(level, 'minors')} {self.d.team_name(p['team_id'])}".strip()
 
     def can_play(self, p, pos):

@@ -16,10 +16,10 @@ function scoutResults(reports) {
       ? panel(
           "Side by side",
           table(
-            ["Player", "This year", "Wins / season", "Fenway", "Role for us", "Cost / value"],
+            ["Player", "This year", "Wins / season", "Our park", "Role for us", "Cost / value"],
             reports.map(
               (r) =>
-                `<tr><td>${link(r)}<small>${esc(r.position)} · age ${r.age} · ${esc(r.where)}</small></td><td>${esc(r.this_year)}</td><td class="num">${fmt(r.wins, 1)}</td><td>${esc(r.fenway.verdict)}</td><td>${esc(r.fit.role)}</td><td>${worth(r.money.value)}<small>${esc(r.money.label)}</small></td></tr>`,
+                `<tr><td>${link(r)}<small>${esc(r.position)} · age ${r.age} · ${esc(r.where)}</small></td><td>${esc(r.this_year)}</td><td class="num">${fmt(r.wins, 1)}</td><td>${esc(r.park.verdict)}</td><td>${esc(r.fit.role)}</td><td>${worth(r.money.value)}<small>${esc(r.money.label)}</small></td></tr>`,
             ),
           ),
         )
@@ -43,7 +43,7 @@ function scoutCard(r) {
     <p class="scout-verdict">${esc(r.verdict)}</p>
     <p>${esc(r.summary)}</p>
     <div class="scout-grid"><div><h4>Tools (now → ceiling)</h4><ul class="tool-list">${tools}</ul></div><div><h4>This year</h4><p>${esc(r.this_year)}</p>${history ? `<h4>Recent seasons</h4><ul class="scout-history">${history}</ul>` : ""}</div></div>
-    <dl class="scout-facts"><dt>Development</dt><dd>${esc(r.development.stage)}. ${esc(r.development.path)}</dd><dt>Fenway</dt><dd><b>${esc(r.fenway.verdict)}</b>. ${esc(r.fenway.note)}</dd><dt>Fit</dt><dd><b>${esc(r.fit.role)}</b>. ${esc(r.fit.line)}</dd><dt>Money</dt><dd>${esc(r.money.line)}</dd></dl>
+    <dl class="scout-facts"><dt>Development</dt><dd>${esc(r.development.stage)}. ${esc(r.development.path)}</dd><dt>${esc(r.park.name)}</dt><dd><b>${esc(r.park.verdict)}</b>. ${esc(r.park.note)}</dd><dt>Fit</dt><dd><b>${esc(r.fit.role)}</b>. ${esc(r.fit.line)}</dd><dt>Money</dt><dd>${esc(r.money.line)}</dd></dl>
     <div class="actions">${jevButton("fit", { id: r.id }, "Ask Jev how he fits us")}${prospect ? jevButton("prospect", { id: r.id }, `Ask Jev: is ${r.name}'s run real?`) : ""}</div>
   </article>`;
 }
