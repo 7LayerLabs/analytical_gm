@@ -32,7 +32,21 @@ Goal: make it safe to change, stop the disk growth, then prove the numbers.
 - [x] Verify: tests pass, API outputs identical to baseline, all 14 tabs render with no console errors
 - [x] Stop the live-save test from importing into the real data folder (fdf27f2)
 
-### Phase D: Decisive answers (DRAFT, planning with Derek, nothing built)
+### Guiding principle (Derek, 2026-10-01)
+"An assistant GM with access to an analytical department", not an analytics department.
+Real players, real value, real wording. On the surface: the call, names, dollars, wins, years.
+No "n over x", percentiles, cohorts or "preference grade" up front; the analytics department's
+work lives one click down under "See the numbers". Confidence is said plainly (strong / lean),
+not buried in disclaimers.
+
+### Agreed with Derek (2026-10-01)
+- Call scale: Do it / Do it if... / Don't / Hang up (can modify later)
+- Dollar values: yes ("you give $148M, you get $17M")
+- "Will the AI accept" prediction: PARKED until Derek decides
+- Identities: Theo's set plus the current-app ones Derek likes (bring a merged list at D5)
+- Order: trades -> signings/extensions/promotions -> Theo fold-in; storage fix slotted in between
+
+### Phase D: Decisive answers
 Derek's problem (2026-10-01): "not giving definitive answers, no strong suggestions, no pro/cons of making a trade".
 Evidence from the current app (snapshot 2026-07-01):
 - Trade Roman Anthony (22, 10/10 now and potential, signed through 2034) for reliever Cade Smith -> "Revise the package". Should be an emphatic no.
@@ -41,7 +55,8 @@ Evidence from the current app (snapshot 2026-07-01):
 - Every case repeats the same two "verify in OOTP" checks.
 Draft steps (order and details to agree with Derek):
 - [ ] D1 Trade calls: one call (Do it / Do it if... / Don't / Hang up) + strength, pros/cons with numbers, "what would make it work", "will the AI accept"
-- [ ] D2 Value engine behind D1: surplus value (projected WAR x $/WAR - salary over years of control) plus OOTP's own exported overall/talent value for AI acceptance
+- [x] D2 Value engine (value.py): dollars a player is worth to us over the years we control him. Calibrated per export from the save: rating->WAR lines (corr .80 bat / .76 SP / .65 RP), $/WAR from veteran deals ($6.8M), delta-method aging, development-to-potential by age; real MLB results blended in (2 seasons = half weight); two-way players add pitching; prospects valued as develop/stall mixture by level. 10 tests.
+  - Known: mega-deals (Soto, Vlad) read deeply negative; partly real (ages 34-37), partly this league's $6.8M/win. Team/player options treated as scheduled years for now.
 - [ ] D3 Same treatment for signings (sign at <= $X for <= N years / pass), extensions, promotions
 - [ ] D4 Strip repeated boilerplate checks; one global "make moves in OOTP" footnote
 - [ ] D5 Theo Scout fold-in (only the parts that earn their place): identity weights that change rankings, hunt list, exit-velo/barrel data; one identity set, not two
