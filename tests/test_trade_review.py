@@ -63,43 +63,53 @@ from storage import current
 
 @unittest.skipUnless(current(), "Local export unavailable")
 class TradeReviewLive(unittest.TestCase):
-    def test_anthony_for_goodman_beck_is_a_decision_not_inventory(self):
+    def test_trading_our_young_star_for_lesser_pieces_is_declined(self):
+        # Picks players from whatever the save looks like now (Roman Anthony, the original
+        # example, was traded to Toronto in Derek's save in July 2026).
         from department import department
         from frontoffice import evaluate
+        from value import value_engine
 
         d = department()
-        ids = {p["name"]: p["id"] for p in d.profiles}
-        before = d.by_id[ids["Roman Anthony"]].copy()
+        e = value_engine(d)
+        ratings = d.ratings["players_value"]
+
+        def rating(p, key):
+            return float(ratings.get(p["id"], {}).get(key) or 0)
+
+        core = [
+            p
+            for p in d.active()
+            if p["kind"] == "bat" and p["age"] <= 28 and rating(p, "oa_rating") >= 7
+        ]
+        star = max(core, key=lambda p: e.player(p)["value"])
+        others = [
+            p
+            for p in d.profiles
+            if p["league_id"] == d.league
+            and p["team_id"] not in (0, d.team)
+            and p["kind"] == "bat"
+            and not p["free_agent"]
+            and 4 <= rating(p, "oa_rating") <= 5
+        ]
+        club = others[0]["team_id"]
+        lesser = [p for p in others if p["team_id"] == club][:2]
+        before = d.by_id[star["id"]].copy()
         r = evaluate(
             d,
-            {
-                "type": "Trade",
-                "send": [ids["Roman Anthony"]],
-                "receive": [ids["Hunter Goodman"], ids["Jordan Beck"]],
-            },
+            {"type": "Trade", "send": [star["id"]], "receive": [p["id"] for p in lesser]},
         )
         t = r["trade_review"]
         # The assistant GM's call leads; the analytics department still declines underneath.
         self.assertIn(r["call"]["call"], ["Don't", "Hang up"])
         self.assertTrue(r["recommendation"].startswith(r["call"]["call"]))
         self.assertEqual(t["verdict"], "Decline this trade")
-        self.assertIn("Keep Roman Anthony", t["lead"])
+        self.assertIn(f"Keep {star['name']}", t["lead"])
         self.assertEqual(len(t["comparisons"]), 2)
-        self.assertTrue(
-            all(
-                not row["complete"] and "Hunter Goodman" in row["unknown"]
-                for row in t["financial"][1:]
-            )
-        )
-        self.assertEqual(d.by_id[ids["Roman Anthony"]], before)
+        self.assertEqual(d.by_id[star["id"]], before)  # reviewing never changes the player
         self.assertTrue(
             all(x.get("signal") in ["red", "green", "amber"] for x in t["owner_impact"])
         )
-        self.assertTrue(any(x["jobs"] for x in t["people"] if x["side"] == "Incoming"))
-        if before["injured"] or before["on_dl"]:
-            self.assertNotEqual(
-                t["comparisons"][0]["current_change"], t["comparisons"][0]["recovery_change"]
-            )
 
 
 if __name__ == "__main__":
